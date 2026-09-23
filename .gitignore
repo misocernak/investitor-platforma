@@ -1,0 +1,21 @@
+/vendor
+/node_modules
+/.env
+/public/storage
+
+# Fajlovi koji nastaju na serveru (sesije, keš, logovi, upload-ovana dokumentacija) — nikad u git
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/documents/*
+/storage/app/private/*
+/storage/app/public/*
+/bootstrap/cache/*.php
+
+# Prazne foldere čuvamo preko .gitkeep
+!**/.gitkeep
+
+# graphify mapa projekta (lokalno)
+graphify-out/

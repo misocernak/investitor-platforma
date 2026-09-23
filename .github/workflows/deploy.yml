@@ -1,0 +1,44 @@
+name: Deploy na investitori.temelj.info
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:        # dugme "Run workflow" na GitHub-u za ručno pokretanje
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preuzmi kod
+        uses: actions/checkout@v4
+
+      - name: Pripremi PHP 8.2 i Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+
+      - name: Instaliraj Laravel biblioteke (vendor/)
+        run: |
+          mkdir -p bootstrap/cache
+          composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      # FTP akcija preskače fajlove koji počinju sa ".git" (i .gitkeep), pa bi prazni
+      # folderi koje Laravel mora da ima ostali nenapravljeni na serveru.
+      - name: Oznaci prazne foldere
+        run: find storage bootstrap/cache -type d -exec touch {}/.keep \;
+
+      - name: Uploaduj na server preko FTP-a
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            .env

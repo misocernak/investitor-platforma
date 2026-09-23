@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Model;
+
+class Unit extends Model
+{
+    use BelongsToTenant;
+
+    protected $fillable = [
+        'tenant_id', 'zgrada_id', 'oznaka', 'sprat', 'kvadratura', 'broj_soba',
+        'cena', 'kupac_id', 'status', 'arhiviran',
+    ];
+
+    protected $casts = ['arhiviran' => 'boolean'];
+
+    public function building()
+    {
+        return $this->belongsTo(Building::class, 'zgrada_id');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'kupac_id');
+    }
+
+    public function claims()
+    {
+        return $this->hasMany(Claim::class, 'stan_id');
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class, 'stan_id');
+    }
+
+    public function otvoreneReklamacije()
+    {
+        return $this->claims()->whereNotIn('status', ['Resena', 'Odbijena']);
+    }
+}
