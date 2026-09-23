@@ -39,9 +39,10 @@ jobs:
       - name: Oznaci prazne foldere
         run: find storage bootstrap/cache -type d -exec touch {}/.keep \;
 
-      # Namecheap povremeno ne otvori FTP vezu na vreme kad se šalje mnogo fajlova
-      # (prvi deploy nosi i ceo vendor/). Zato: duži timeout + do 2 nova pokušaja.
+      # Namecheap povremeno prekine FTP vezu usred slanja ("Timeout (control socket)").
+      # Zato: do 5 pokušaja, sa pauzom pre svakog novog (server se "odmori").
       # Pokušaj koji uspe upisuje stanje na server, pa sledeći deploy šalje samo izmene.
+
       - name: Uploaduj na server preko FTP-a (pokušaj 1)
         id: ftp1
         continue-on-error: true
@@ -60,6 +61,10 @@ jobs:
             **/node_modules/**
             **/tests/**
             .env
+
+      - name: Pauza pre pokušaja 2
+        if: steps.ftp1.outcome == 'failure'
+        run: sleep 30
 
       - name: Uploaduj na server preko FTP-a (pokušaj 2)
         id: ftp2
@@ -81,9 +86,61 @@ jobs:
             **/tests/**
             .env
 
+      - name: Pauza pre pokušaja 3
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        run: sleep 60
+
       - name: Uploaduj na server preko FTP-a (pokušaj 3)
         id: ftp3
         if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          timeout: 120000
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            .env
+
+      - name: Pauza pre pokušaja 4
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure' && steps.ftp3.outcome == 'failure'
+        run: sleep 90
+
+      - name: Uploaduj na server preko FTP-a (pokušaj 4)
+        id: ftp4
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure' && steps.ftp3.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          timeout: 120000
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            .env
+
+      - name: Pauza pre pokušaja 5
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure' && steps.ftp3.outcome == 'failure' && steps.ftp4.outcome == 'failure'
+        run: sleep 120
+
+      - name: Uploaduj na server preko FTP-a (pokušaj 5)
+        id: ftp5
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure' && steps.ftp3.outcome == 'failure' && steps.ftp4.outcome == 'failure'
         continue-on-error: false
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
