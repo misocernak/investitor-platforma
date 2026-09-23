@@ -4,15 +4,64 @@
 
 @layer base {
   html, body { margin: 0; padding: 0; }
-  body { overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
-  main > :first-child { margin-top: 0 !important; }
-  main > :last-child { margin-bottom: 0 !important; }
-  /* Polja forme: ista visina teksta kao ostatak interfejsa */
+  body { overscroll-behavior: none; -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; }
+  /* Polja forme: isti font kao ostatak interfejsa */
   input, select, textarea, button { font: inherit; }
-  :focus-visible { outline: 2px solid #316bf3; outline-offset: 2px; }
+  :focus-visible { outline: 2px solid #4059aa; outline-offset: 2px; }
+  /* Brojevi u tabelama poravnati (iste širine cifara) */
+  .font-mono-num, td, .tabular-nums { font-variant-numeric: tabular-nums; }
 }
 
-/* Material Symbols ikonice (font se učitava samo sa ikonicama koje koristimo) */
+/*
+ * Zajednički delovi interfejsa — koriste se na svim ekranima da bi izgled bio ujednačen.
+ * kartica   = bela površina sa blagom senkom
+ * dugme-*   = dugmad (primarno = crno, jedno po ekranu; sekundarno = svetlo)
+ * polje     = input / select / textarea
+ * oznaka    = mala velika slova iznad polja i u zaglavljima
+ * tabela    = tabele sa listama (stanovi, reklamacije, dokumenti...)
+ */
+@layer components {
+  .kartica { @apply bg-surface-container-lowest rounded-lg shadow-sm; }
+
+  .dugme-primarno,
+  .dugme-sekundarno,
+  .dugme-tiho {
+    @apply inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded font-label-md text-label-md whitespace-nowrap transition-colors select-none;
+  }
+  .dugme-primarno { @apply bg-primary text-on-primary hover:bg-inverse-surface shadow-sm; }
+  .dugme-sekundarno { @apply bg-surface-container-low text-on-surface hover:bg-surface-container; }
+  .dugme-tiho { @apply text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low; }
+  .dugme-malo { @apply h-8 px-2.5; }
+
+  .polje {
+    @apply w-full h-9 px-3 rounded bg-surface-container-lowest border border-outline-variant text-on-surface font-body-md text-body-md placeholder:text-outline transition-colors;
+  }
+  .polje:focus { @apply outline-none border-secondary ring-2 ring-secondary/15; }
+  textarea.polje { @apply h-auto py-2 leading-relaxed; }
+  select.polje {
+    @apply pr-8 cursor-pointer appearance-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2345464d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+  }
+  select.polje[multiple] { @apply h-auto py-1 pr-3; background-image: none; }
+  input[type='file'].polje { @apply h-auto py-1.5 cursor-pointer; }
+
+  .oznaka { @apply block font-label-sm text-label-sm uppercase text-on-surface-variant; }
+
+  .tabela { @apply w-full text-left border-collapse; }
+  .tabela th {
+    @apply h-9 px-4 bg-surface-container-low font-label-sm text-label-sm uppercase text-on-surface-variant whitespace-nowrap;
+  }
+  .tabela td { @apply px-4 py-2.5 font-body-md text-body-md text-on-surface border-t border-surface-container align-middle; }
+  .tabela tbody tr { @apply transition-colors; }
+  .tabela tbody tr:hover { @apply bg-surface-container-low/60; }
+  .tabela tr[data-href] { @apply cursor-pointer; }
+
+  .cip { @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-label-sm text-label-sm whitespace-nowrap; }
+}
+
+/* Material Symbols ikonice (font se učitava samo sa ikonicama sa spiska config/ikonice.php) */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -34,5 +83,19 @@
   flex-shrink: 0;
 }
 
-/* Tanji, diskretan scrollbar umesto potpuno skrivenog (tabele moraju moći da se pomeraju) */
-* { scrollbar-width: thin; scrollbar-color: #c5c6cd transparent; }
+/* Sklopljen levi meni (samo ikonice) — više mesta za sadržaj na laptopovima od 13–15" */
+@media (min-width: 768px) {
+  .meni-uzak .meni-bocni { width: 4rem; }
+  .meni-uzak .meni-sadrzaj { padding-left: 4rem; }
+  .meni-uzak .meni-tekst { display: none; }
+  .meni-uzak .meni-stavka { justify-content: center; padding-left: 0; padding-right: 0; }
+  .meni-uzak .meni-okreni { transform: rotate(180deg); }
+}
+
+/* Tanji, diskretan scrollbar (tabele moraju moći da se pomeraju) */
+* { scrollbar-width: thin; scrollbar-color: #c6c6cd transparent; }
+
+@media print {
+  .meni-bocni, .meni-gornji, .ne-stampaj { display: none !important; }
+  .meni-sadrzaj { padding-left: 0 !important; }
+}

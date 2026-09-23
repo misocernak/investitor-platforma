@@ -37,6 +37,8 @@ podešavanja) piši korak po korak, jednostavnim jezikom.
 - CSS se pravi na GitHub-u pri deploy-u (`npm run build:css` → `public/css/app.css`), tokeni su u `tailwind.config.js`. Nema Tailwind CDN-a.
 - Ikonice (Material Symbols) se učitavaju samo sa spiska u `config/ikonice.php`. Nova ikonica u ekranu = dodati je i tamo (abecedno), inače se ne prikazuje.
 - Statusi se prikazuju kroz `App\Support\Prikaz` i `<x-status :v="..."/>`, nikad sirovo.
+- Ekrani se grade od zajedničkih delova: CSS klase `kartica`, `dugme-primarno` / `dugme-sekundarno` / `dugme-tiho`, `polje`, `oznaka`, `tabela`, `cip` (resources/css/app.css) i komponente `<x-zaglavlje>`, `<x-pokazatelj>`, `<x-modal>`, `<x-polje>`, `<x-prazno>`.
+- Bez bočnih panela za detalje (korisnici rade na 14–15" laptopovima): lista → zasebna stranica detalja (npr. `units.show`, `claims.show`); unos ide u `<x-modal>`.
 
 ## Posle deploy-a (korisnik pokreće u cPanel Terminalu)
 

@@ -11,6 +11,31 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
+    // Centralni registar dokumenata svih projekata (meni "Dokumentacija")
+    public function index(Request $request)
+    {
+        $query = Document::with('project', 'building.project', 'unit')->orderByDesc('created_at');
+
+        if ($q = trim((string) $request->get('q'))) {
+            $query->where(fn ($w) => $w->where('naziv', 'like', "%{$q}%")->orWhere('izdavalac', 'like', "%{$q}%"));
+        }
+        if ($tip = $request->get('tip')) {
+            $query->where('tip', $tip);
+        }
+        if ($zgradaId = $request->get('zgrada')) {
+            $query->where('zgrada_id', $zgradaId);
+        }
+        if (!$request->boolean('arhiva')) {
+            $query->where('aktivna_verzija', true);
+        }
+
+        return view('documents.index', [
+            'dokumenti' => $query->get(),
+            'tipoviDokumenata' => DocumentType::zaTenant()->orderBy('naziv')->get(),
+            'zgrade' => \App\Models\Building::with('project')->where('arhiviran', false)->orderBy('naziv')->get(),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -23,6 +48,15 @@ class DocumentController extends Controller
             'zgrada_id' => ['required_without:stan_id', 'nullable', 'exists:buildings,id'],
             'stan_id' => ['nullable', 'exists:units,id'],
         ]);
+
+        // Dokument stana pripada i zgradi tog stana
+        if (empty($data['zgrada_id']) && !empty($data['stan_id'])) {
+            $data['zgrada_id'] = \App\Models\Unit::find($data['stan_id'])?->zgrada_id;
+        }
+        // Projekat se popunjava iz zgrade kad nije poslat (npr. unos iz opšte Dokumentacije)
+        if (empty($data['projekat_id']) && !empty($data['zgrada_id'])) {
+            $data['projekat_id'] = \App\Models\Building::find($data['zgrada_id'])?->projekat_id;
+        }
 
         // Verzionisanje: nova verzija iste "linije" (isti tip + zgrada/stan + osnovni naziv)
         $postojeci = Document::where('tip', $data['tip'])

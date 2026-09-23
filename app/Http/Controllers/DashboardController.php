@@ -28,16 +28,26 @@ class DashboardController extends Controller
                 ->count(),
         ];
 
-        $projekti = Project::with('buildings')->where('arhiviran', false)->latest()->get();
+        $projekti = Project::with(['buildings' => fn ($q) => $q->withCount('units')])
+            ->where('arhiviran', false)->latest()->get();
 
         // To-do blok: najkriticnije nedostajuce stavke (PRD 9.1)
         $todo = ChecklistItem::with('checklist.building.project')
             ->where('zavrseno', false)
             ->whereHas('checklist.building', fn ($q) => $q->where('arhiviran', false))
             ->orderBy('updated_at')
-            ->limit(10)
+            ->limit(8)
             ->get();
 
-        return view('dashboard', compact('karte', 'projekti', 'todo'));
+        // Otvorene reklamacije kojima je rok prošao ili ističe u narednih 7 dana (najhitnije prve)
+        $hitneReklamacije = Claim::with('unit.building')
+            ->whereNotIn('status', ['Resena', 'Odbijena'])
+            ->whereNotNull('rok_resavanja')
+            ->where('rok_resavanja', '<=', now()->addDays(7)->toDateString())
+            ->orderBy('rok_resavanja')
+            ->limit(8)
+            ->get();
+
+        return view('dashboard', compact('karte', 'projekti', 'todo', 'hitneReklamacije'));
     }
 }

@@ -1,63 +1,97 @@
+@use('App\Support\Prikaz')
 @extends('layouts.app')
+@section('naslov', 'Korisnici i uloge')
+
 @section('content')
-<div class="flex flex-col gap-space-lg w-full max-w-7xl mx-auto pt-space-xs">
-  <div class="flex items-center justify-between">
-    <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Korisnici i uloge</h1>
-    <button data-modal-open="modal-new-user" class="h-9 px-space-md bg-primary text-on-primary font-body-sm font-semibold rounded-lg shadow-sm">+ Novi korisnik</button>
-  </div>
-  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
-    <table class="w-full text-left font-body-sm text-body-sm">
+<x-zaglavlje naslov="Korisnici i uloge" opis="Ko ima pristup nalogu firme i šta sme da radi. Uloga i status se menjaju direktno u tabeli.">
+  <button type="button" data-modal-open="modal-novi-korisnik" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">person_add</span>Novi korisnik</button>
+</x-zaglavlje>
+
+<section class="kartica overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="tabela">
       <thead>
-        <tr class="bg-surface-container-low text-on-surface-variant font-label-xs uppercase tracking-wider">
-          <th class="py-2.5 px-space-md">Ime i prezime</th>
-          <th class="py-2.5 px-space-md">Email</th>
-          <th class="py-2.5 px-space-md">Uloga</th>
-          <th class="py-2.5 px-space-md">Status naloga</th>
-          <th class="py-2.5 px-space-md">Dodeljene zgrade</th>
+        <tr>
+          <th>Korisnik</th>
+          <th>Uloga</th>
+          <th>Status naloga</th>
+          <th>Dodeljene zgrade</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-container-low">
+      <tbody>
         @foreach($korisnici as $k)
-        <tr class="hover:bg-surface-container-low">
-          <td class="py-3 px-space-md font-semibold text-on-surface">{{ $k->ime_prezime }}</td>
-          <td class="py-3 px-space-md text-on-surface-variant">{{ $k->email }}</td>
-          <td class="py-3 px-space-md">{{ \App\Support\Prikaz::label($k->uloga) }}</td>
-          <td class="py-3 px-space-md"><span class="font-label-xs px-2 py-0.5 rounded font-semibold {{ $k->status_naloga === 'Aktivan' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface' }}">{{ \App\Support\Prikaz::label($k->status_naloga) }}</span></td>
-          <td class="py-3 px-space-md text-on-surface-variant">{{ $k->dodeljeneZgrade->pluck('naziv')->implode(', ') ?: '—' }}</td>
+        @php
+          $ini = collect(explode(' ', $k->ime_prezime))->filter()->take(2)->map(fn ($d) => mb_strtoupper(mb_substr($d, 0, 1)))->implode('');
+          // Administrator ne sme da menja Vlasnika; niko ne menja sam sebe (da se ne zaključa)
+          $mozeMenjati = $k->id !== $currentUser->id && !($k->uloga === 'Vlasnik' && $currentUser->uloga !== 'Vlasnik');
+        @endphp
+        <tr>
+          <td>
+            <div class="flex items-center gap-space-sm">
+              <span class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 text-[12px] font-semibold">{{ $ini }}</span>
+              <div class="min-w-0">
+                <div class="font-semibold">{{ $k->ime_prezime }}@if($k->id === $currentUser->id)<span class="font-normal text-on-surface-variant"> (vi)</span>@endif</div>
+                <div class="font-body-sm text-body-sm text-on-surface-variant">{{ $k->email }}</div>
+              </div>
+            </div>
+          </td>
+          @if($mozeMenjati)
+          <td colspan="2">
+            <form method="POST" action="{{ route('users.update', $k) }}" class="flex flex-wrap items-center gap-space-sm">
+              @csrf @method('PATCH')
+              <select name="uloga" data-auto-submit class="polje h-8 w-auto" aria-label="Uloga">
+                @foreach($uloge as $u)<option value="{{ $u }}" @selected($k->uloga === $u)>{{ Prikaz::label($u) }}</option>@endforeach
+              </select>
+              <select name="status_naloga" data-auto-submit class="polje h-8 w-auto" aria-label="Status naloga">
+                @foreach(config('statusi.status_naloga') as $s)<option value="{{ $s }}" @selected($k->status_naloga === $s)>{{ Prikaz::label($s) }}</option>@endforeach
+              </select>
+            </form>
+          </td>
+          @else
+          <td>{{ Prikaz::label($k->uloga) }}</td>
+          <td><x-status :v="$k->status_naloga" /></td>
+          @endif
+          <td class="text-on-surface-variant">{{ $k->dodeljeneZgrade->pluck('naziv')->implode(', ') ?: '—' }}</td>
         </tr>
         @endforeach
       </tbody>
     </table>
   </div>
+</section>
+
+<div class="p-space-md rounded-lg bg-surface-container-low flex items-start gap-space-md">
+  <span class="material-symbols-outlined text-[20px] text-on-surface-variant">info</span>
+  <ul class="font-body-md text-body-md text-on-surface-variant flex flex-col gap-0.5">
+    <li><strong class="text-on-surface font-semibold">Vlasnik / Administrator</strong> — sve, uključujući korisnike.</li>
+    <li><strong class="text-on-surface font-semibold">Operater</strong> — unos i izmena projekata, stanova, dokumenata i reklamacija.</li>
+    <li><strong class="text-on-surface font-semibold">Nadzor / izvođač</strong> — vidi samo reklamacije koje su mu dodeljene i menja im status.</li>
+  </ul>
 </div>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 backdrop-blur-sm hidden" id="modal-new-user">
-  <div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-xl p-space-lg flex flex-col gap-space-md mx-4 max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between">
-      <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Novi interni korisnik</h3>
-      <button class="p-1 rounded-lg text-on-surface-variant" data-modal-close="modal-new-user"><span class="material-symbols-outlined text-[20px]">close</span></button>
+<x-modal id="modal-novi-korisnik" naslov="Novi korisnik" ikonica="person_add">
+  <form method="POST" action="{{ route('users.store') }}" class="flex flex-col gap-space-md">
+    @csrf
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+      <x-polje labela="Ime i prezime *" za="nk-ime"><input class="polje" id="nk-ime" name="ime_prezime" required/></x-polje>
+      <x-polje labela="Email *" za="nk-email"><input class="polje" id="nk-email" name="email" type="email" required/></x-polje>
+      <x-polje labela="Početna lozinka *" za="nk-lozinka" pomoc="Najmanje 8 znakova. Prosledite je korisniku."><input class="polje" id="nk-lozinka" name="password" type="password" required minlength="8" autocomplete="new-password"/></x-polje>
+      <x-polje labela="Uloga *" za="nk-uloga">
+        <select class="polje" id="nk-uloga" name="uloga" required onchange="document.getElementById('nk-zgrade').classList.toggle('hidden', this.value !== 'Nadzor_izvodjac')">
+          @foreach($uloge as $u)<option value="{{ $u }}" @selected($u === 'Operater')>{{ Prikaz::label($u) }}</option>@endforeach
+        </select>
+      </x-polje>
     </div>
-    <form method="POST" action="{{ route('users.store') }}" class="flex flex-col gap-space-md">
-      @csrf
-      <div class="grid grid-cols-2 gap-space-md">
-        <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Ime i prezime *</label><input name="ime_prezime" required class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Email *</label><input name="email" type="email" required class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-      </div>
-      <div class="grid grid-cols-2 gap-space-md">
-        <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Lozinka *</label><input name="password" type="password" required minlength="8" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Uloga *</label>
-          <select name="uloga" required class="h-9 px-space-sm bg-surface-container-low rounded-lg">
-            @foreach($uloge as $u)<option value="{{ $u }}">{{ \App\Support\Prikaz::label($u) }}</option>@endforeach
-          </select>
-        </div>
-      </div>
-      <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Dodeljene zgrade (samo za Nadzor/izvođač)</label>
-        <select name="dodeljene_zgrade[]" multiple class="h-24 px-space-sm bg-surface-container-low rounded-lg">
+    <div id="nk-zgrade" class="hidden">
+      <x-polje labela="Dodeljene zgrade" za="nk-zgrade-izbor" pomoc="Držite Ctrl za izbor više zgrada.">
+        <select class="polje" id="nk-zgrade-izbor" name="dodeljene_zgrade[]" multiple size="5">
           @foreach($zgrade as $z)<option value="{{ $z->id }}">{{ $z->naziv }}</option>@endforeach
         </select>
-      </div>
-      <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-new-user" class="px-space-md py-2 bg-surface-container-high rounded-lg font-label-md">Otkaži</button><button class="px-space-lg py-2 bg-primary text-on-primary rounded-lg font-label-md shadow-sm">Kreiraj korisnika</button></div>
-    </form>
-  </div>
-</div>
+      </x-polje>
+    </div>
+    <div class="flex justify-end gap-space-sm pt-space-xs">
+      <button type="button" data-modal-close="modal-novi-korisnik" class="dugme-sekundarno">Otkaži</button>
+      <button class="dugme-primarno">Kreiraj korisnika</button>
+    </div>
+  </form>
+</x-modal>
 @endsection

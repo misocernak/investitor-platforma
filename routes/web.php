@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/stanovi/{unit}', [UnitController::class, 'show'])->name('units.show');
         Route::patch('/stanovi/{unit}', [UnitController::class, 'update'])->name('units.update');
 
+        Route::get('/dokumenti', [DocumentController::class, 'index'])->name('documents.index');
         Route::post('/dokumenti', [DocumentController::class, 'store'])->name('documents.store');
         Route::get('/dokumenti/{document}/preuzmi', [DocumentController::class, 'download'])->name('documents.download');
         Route::delete('/dokumenti/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
@@ -55,6 +56,8 @@ Route::middleware('auth')->group(function () {
     // Reklamacije - svi ulogovani (Nadzor vidi samo svoje, logika u kontroleru)
     Route::get('/reklamacije', [ClaimController::class, 'index'])->name('claims.index');
     Route::post('/reklamacije', [ClaimController::class, 'store'])->middleware('role:Vlasnik,Administrator,Operater')->name('claims.store');
+    Route::get('/reklamacije/prilog/{file}', [ClaimController::class, 'prilog'])->name('claims.file');
+    Route::get('/reklamacije/{claim}', [ClaimController::class, 'show'])->name('claims.show');
     Route::patch('/reklamacije/{claim}', [ClaimController::class, 'update'])->name('claims.update');
     Route::post('/reklamacije/{claim}/beleske', [ClaimController::class, 'dodajBelesku'])->name('claims.notes');
 });

@@ -14,7 +14,7 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        $projekti = Project::with(['buildings' => fn ($q) => $q->withCount('units')])
+        $projekti = Project::with(['buildings' => fn ($q) => $q->where('arhiviran', false)->withCount('units')])
             ->where('arhiviran', false)->latest()->get();
         return view('projects.index', compact('projekti'));
     }
@@ -42,38 +42,53 @@ class ProjectController extends Controller
 
     public function show(Request $request, Project $project)
     {
-        $project->load('buildings.checklists.items', 'buildings.units.customer');
+        $project->load(['buildings' => fn ($q) => $q->where('arhiviran', false)->withCount('units')]);
 
-        // Jednostavan slucaj: projekat ima jednu zgradu; ako ih vise, uzmi prvu za dosije
-        $zgrada = $project->buildings->first();
-        if ($zgrada) {
-            $zgrada->load('units.customer', 'checklists.items', 'documents');
-        }
+        // Dosije se vodi po zgradi: izabrana zgrada (?zgrada=ID) ili prva zgrada projekta
+        $zgrada = $project->buildings->firstWhere('id', (int) $request->get('zgrada')) ?? $project->buildings->first();
 
         $tab = $request->get('tab', 'pregled');
+        if (!in_array($tab, ['pregled', 'dokumentacija', 'stanovi', 'checkliste', 'reklamacije'], true)) {
+            $tab = 'pregled';
+        }
+
         $dokumenti = collect();
-        $tipoviDokumenata = DocumentType::zaTenant()->orderBy('naziv')->get();
         $reklamacije = collect();
+        $stanovi = collect();
+        $checkliste = collect();
 
         if ($zgrada) {
+            $stanovi = $zgrada->units()->with('customer')->withCount([
+                'claims as otvorene_reklamacije_count' => fn ($q) => $q->whereNotIn('status', ['Resena', 'Odbijena']),
+            ])->where('arhiviran', false)->orderBy('oznaka')->get();
+
+            $checkliste = $zgrada->checklists()->withCount([
+                'items as ukupno_stavki',
+                'items as reseno_stavki' => fn ($q) => $q->where('zavrseno', true),
+            ])->get();
+
             $query = Document::with('unit')->where('zgrada_id', $zgrada->id);
             if ($tip = $request->get('tip')) {
                 $query->where('tip', $tip);
             }
+            if (!$request->boolean('arhiva')) {
+                $query->where('aktivna_verzija', true);
+            }
             $dokumenti = $query->orderByDesc('created_at')->get();
 
-            $reklamacije = Claim::with('unit', 'odgovorni')
-                ->whereIn('stan_id', $zgrada->units->pluck('id'))
-                ->latest()
+            $reklamacije = Claim::with('unit.building', 'odgovorni')
+                ->whereIn('stan_id', $stanovi->pluck('id'))
+                ->latest('datum_prijave')
                 ->get();
         }
 
+        $tipoviDokumenata = DocumentType::zaTenant()->orderBy('naziv')->get();
         $statusiProjekta = config('statusi.status_projekta');
         $statusiZgrade = config('statusi.status_zgrade');
         $statusiStana = config('statusi.status_stana');
 
         return view('projects.show', compact(
-            'project', 'zgrada', 'tab', 'dokumenti', 'tipoviDokumenata',
+            'project', 'zgrada', 'tab', 'dokumenti', 'tipoviDokumenata', 'stanovi', 'checkliste',
             'reklamacije', 'statusiProjekta', 'statusiZgrade', 'statusiStana'
         ));
     }
@@ -89,6 +104,7 @@ class ProjectController extends Controller
             'datum_pocetka_gradnje' => ['nullable', 'date'],
             'planirani_datum_zavrsetka' => ['nullable', 'date'],
             'status' => ['required', FiksneListe::pravila('status_projekta')],
+            'napomena' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $staro = ['status' => $project->status];

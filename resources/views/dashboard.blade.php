@@ -1,120 +1,129 @@
 @extends('layouts.app')
+@section('naslov', 'Nadzorna tabla')
 
 @section('content')
-<div class="flex flex-col gap-space-lg w-full max-w-7xl mx-auto pt-space-xs">
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
-    <div>
-      <div class="flex items-center gap-space-sm text-on-surface-variant font-label-xs text-label-xs uppercase tracking-wider">
-        <span>Operativni pregled</span><span>/</span><span class="text-secondary font-semibold">Stanje portfelja</span>
-      </div>
-      <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mt-0.5">Nadzorna tabla</h1>
+<x-zaglavlje naslov="Nadzorna tabla" opis="Stanje svih projekata, otvorene reklamacije i dokumenta koja nedostaju.">
+  <button type="button" data-modal-open="modal-novi-projekat" class="dugme-primarno">
+    <span class="material-symbols-outlined text-[18px]">add</span>Novi projekat
+  </button>
+</x-zaglavlje>
+
+{{-- 4 brojčane kartice (PRD 9.1) — klik vodi na odgovarajuću listu --}}
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-gutter" aria-label="Ključni pokazatelji">
+  <x-pokazatelj labela="Aktivni projekti" :vrednost="$karte['aktivni_projekti']" ikonica="apartment" opis="u portfelju" :href="route('projects.index')" />
+  <x-pokazatelj labela="Zgrade u garanciji" :vrednost="$karte['zgrade_garancija']" ikonica="verified_user" opis="završene / u garanciji" :href="route('checklists.index')" />
+  <x-pokazatelj labela="Otvorene reklamacije" :vrednost="$karte['otvorene_reklamacije']" ikonica="report_problem" ton="greska" opis="prijavljene ili u radu" :href="route('claims.index', ['status' => 'otvorene'])" />
+  <x-pokazatelj labela="Nedostajuće stavke" :vrednost="$karte['nedostajuce_stavke']" ikonica="checklist" opis="u checklistama" :href="route('checklists.index')" />
+</section>
+
+{{-- Projekti (PRD 9.1) --}}
+<section class="kartica overflow-hidden" aria-label="Projekti">
+  <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+    <div class="flex items-center gap-space-sm">
+      <h2 class="font-headline-sm text-headline-sm">Projekti</h2>
+      <span class="cip bg-surface-container text-on-surface-variant">{{ $projekti->count() }}</span>
     </div>
-    <button data-modal-open="modal-new-project" class="flex items-center gap-space-xs px-space-md py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md font-medium shadow-sm hover:bg-primary-container transition-colors self-start sm:self-auto">
-      <span class="material-symbols-outlined text-[18px]">add</span><span>Novi projekat</span>
-    </button>
+    <a href="{{ route('projects.index') }}" class="dugme-tiho dugme-malo">Svi projekti<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
   </div>
-
-  <!-- Traka sa brojcanim karticama - TACNO 4 (PRD 9.1) -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
-    <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between h-28">
-      <div class="flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Broj aktivnih projekata</span><span class="material-symbols-outlined text-secondary text-[20px]">apartment</span></div>
-      <div class="flex items-baseline gap-space-xs"><span class="font-headline-xl text-headline-xl font-bold text-on-surface">{{ $karte['aktivni_projekti'] }}</span><span class="font-label-sm text-label-sm text-on-surface-variant">u portfelju</span></div>
-    </div>
-    <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between h-28">
-      <div class="flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Zgrade u garanciji / postprodaji</span><span class="material-symbols-outlined text-on-surface-variant text-[20px]">verified</span></div>
-      <div class="flex items-baseline gap-space-xs"><span class="font-headline-xl text-headline-xl font-bold text-on-surface">{{ $karte['zgrade_garancija'] }}</span><span class="font-label-sm text-label-sm text-on-surface-variant">objekata</span></div>
-    </div>
-    <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between h-28">
-      <div class="flex items-center justify-between"><span class="font-label-xs text-label-xs text-error uppercase tracking-wider font-semibold">Otvorene reklamacije</span><span class="material-symbols-outlined text-error text-[20px]">report_problem</span></div>
-      <div class="flex items-baseline gap-space-xs"><span class="font-headline-xl text-headline-xl font-bold text-error">{{ $karte['otvorene_reklamacije'] }}</span><span class="font-label-sm text-label-sm text-on-surface-variant">zahteva kupaca</span></div>
-    </div>
-    <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between h-28">
-      <div class="flex items-center justify-between"><span class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Nedostajuće stavke checklisti</span><span class="material-symbols-outlined text-on-surface-variant text-[20px]">rule_folder</span></div>
-      <div class="flex items-baseline gap-space-xs"><span class="font-headline-xl text-headline-xl font-bold text-on-surface">{{ $karte['nedostajuce_stavke'] }}</span><span class="font-label-sm text-label-sm text-on-surface-variant">dokumenta u toku</span></div>
-    </div>
+  @if($projekti->isEmpty())
+    <x-prazno ikonica="domain_add" naslov="Još nema projekata" tekst="Kreirajte prvi projekat i dodajte mu zgradu — dobićete dosije sa dokumentacijom, stanovima, checklistama i reklamacijama.">
+      <button type="button" data-modal-open="modal-novi-projekat" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Novi projekat</button>
+    </x-prazno>
+  @else
+  <div class="overflow-x-auto">
+    <table class="tabela">
+      <thead>
+        <tr>
+          <th>Naziv projekta</th>
+          <th>Lokacija</th>
+          <th class="text-right">Stanova</th>
+          <th>Status</th>
+          <th class="text-center">Otvorene reklamacije</th>
+          <th class="w-10"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach($projekti as $projekat)
+        @php
+          $otvorene = $projekat->otvorene_reklamacije;
+          $jedinica = $projekat->buildings->sum('units_count');
+        @endphp
+        <tr data-href="{{ route('projects.show', $projekat) }}">
+          <td><a href="{{ route('projects.show', $projekat) }}" class="font-semibold hover:underline underline-offset-2">{{ $projekat->naziv }}</a></td>
+          <td class="text-on-surface-variant">{{ $projekat->lokacija_grad ?: '—' }}</td>
+          <td class="text-right font-mono-num">{{ $jedinica ?: ($projekat->broj_planiranih_stanova ?: '—') }}</td>
+          <td><x-status :v="$projekat->status" /></td>
+          <td class="text-center">
+            @if($otvorene > 0)
+              <a href="{{ route('claims.index', ['status' => 'otvorene']) }}" class="cip bg-error-container text-on-error-container">{{ $otvorene }}</a>
+            @else
+              <span class="text-on-surface-variant">0</span>
+            @endif
+          </td>
+          <td class="text-right text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">chevron_right</span></td>
+        </tr>
+        @endforeach
+      </tbody>
+    </table>
   </div>
+  @endif
+</section>
 
-  <div class="grid grid-cols-1 xl:grid-cols-3 gap-space-lg items-start">
-    <!-- Tabela projekata (PRD 9.1) -->
-    <div class="xl:col-span-2 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col">
-      <div class="p-space-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm">
-        <div>
-          <h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Projekti u portfelju</h2>
-          <p class="font-body-sm text-body-sm text-on-surface-variant">Glavni registar stambeno-poslovnih objekata investitora</p>
-        </div>
-        <div class="flex items-center gap-space-xs text-on-surface-variant font-label-xs text-label-xs">
-          <span class="material-symbols-outlined text-[16px]">touch_app</span><span>Kliknite na red za otvaranje dosijea</span>
-        </div>
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-space-lg items-start">
+  {{-- To-do: nedostajuće stavke checklisti (PRD 9.1) --}}
+  <section class="kartica overflow-hidden" aria-label="Nedostajuće stavke checklisti">
+    <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+      <div class="flex items-center gap-space-sm">
+        <span class="w-6 h-6 rounded bg-error/10 text-error flex items-center justify-center"><span class="material-symbols-outlined text-[16px]">priority_high</span></span>
+        <h2 class="font-headline-sm text-headline-sm">Nedostaje u checklistama</h2>
       </div>
-      <div class="overflow-x-auto w-full">
-        <table class="w-full text-left font-body-sm text-body-sm">
-          <thead>
-            <tr class="bg-surface-container-low text-on-surface-variant font-label-xs text-label-xs uppercase tracking-wider">
-              <th class="py-2.5 px-space-md font-medium">Naziv projekta</th>
-              <th class="py-2.5 px-space-md font-medium">Lokacija (grad)</th>
-              <th class="py-2.5 px-space-md font-medium text-right">Broj stanova</th>
-              <th class="py-2.5 px-space-md font-medium text-center">Status</th>
-              <th class="py-2.5 px-space-md font-medium text-right">Otvorene reklamacije</th>
-              <th class="py-2.5 px-space-md text-center w-12"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-container-low">
-            @foreach($projekti as $projekat)
-            <tr class="hover:bg-surface-container-low cursor-pointer transition-colors group" onclick="window.location='{{ route('projects.show', $projekat) }}'">
-              <td class="py-3 px-space-md font-medium text-on-surface">
-                <div class="flex items-center gap-space-xs">
-                  <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-secondary transition-colors">domain</span>
-                  <span class="font-semibold">{{ $projekat->naziv }}</span>
-                </div>
-              </td>
-              <td class="py-3 px-space-md text-on-surface-variant">{{ $projekat->lokacija_grad ?: '—' }}</td>
-              <td class="py-3 px-space-md text-right font-label-md text-label-md text-on-surface">{{ $projekat->broj_planiranih_stanova ?: '—' }}</td>
-              <td class="py-3 px-space-md text-center">
-                <x-status :v="$projekat->status" />
-              </td>
-              <td class="py-3 px-space-md text-right">
-                @if($projekat->otvorene_reklamacije > 0)
-                <span class="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded font-label-xs text-label-xs font-bold bg-error-container text-error">{{ $projekat->otvorene_reklamacije }}</span>
-                @else
-                <span class="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded font-label-xs text-label-xs font-bold bg-surface-container-high text-on-surface-variant">0</span>
-                @endif
-              </td>
-              <td class="py-3 px-space-md text-center text-on-surface-variant group-hover:text-on-surface"><span class="material-symbols-outlined text-[18px]">chevron_right</span></td>
-            </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-      <div class="p-space-sm flex items-center justify-between text-on-surface-variant font-label-xs text-label-xs">
-        <span>Ukupno objekata: {{ $projekti->count() }}</span><span>Sistem: StructureOps Dosije Engine v1.0</span>
-      </div>
+      <a href="{{ route('checklists.index') }}" class="dugme-tiho dugme-malo">Sve checkliste<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
     </div>
-
-    <!-- To-do blok (PRD 9.1) -->
-    <div class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col">
-      <div class="p-space-md pb-space-sm flex items-center justify-between">
-        <div class="flex items-center gap-space-xs">
-          <span class="material-symbols-outlined text-error text-[20px]">assignment_late</span>
-          <h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">To-Do: Nedostajući prilozi</h2>
-        </div>
-        <span class="font-label-xs text-label-xs px-2 py-0.5 rounded bg-error-container text-error font-semibold">{{ $karte['nedostajuce_stavke'] }} stavki</span>
-      </div>
-      <p class="px-space-md pb-space-sm font-body-sm text-body-sm text-on-surface-variant">Obavezne tehničke i pravne stavke checklisti koje blokiraju narednu fazu gradnje ili tehnički prijem:</p>
-      <div class="flex flex-col p-space-sm gap-space-xs">
-        @forelse($todo as $stavka)
-        <div class="p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
-          <div class="flex flex-col min-w-0 pr-space-xs">
-            <span class="font-body-md text-body-md font-medium text-on-surface leading-tight">{{ $stavka->checklist->building->naziv }} — {{ \App\Support\Prikaz::label($stavka->checklist->tip_checkliste) }} — {{ $stavka->naziv_stavke }}</span>
-            <span class="font-label-xs text-label-xs text-on-surface-variant mt-1">Projekat: {{ $stavka->checklist->building->project->naziv ?? '—' }}</span>
+    <div class="px-space-sm pb-space-sm flex flex-col gap-1">
+      @forelse($todo as $stavka)
+      <a href="{{ route('checklists.show', ['building' => $stavka->checklist->zgrada_id, 'tip' => $stavka->checklist->tip_checkliste]) }}" class="group flex items-center justify-between gap-space-md px-space-md py-2.5 rounded bg-surface-container-low hover:bg-surface-container transition-colors">
+        <div class="flex items-center gap-space-sm min-w-0">
+          <span class="w-2 h-2 rounded-full bg-error shrink-0"></span>
+          <div class="min-w-0">
+            <div class="font-label-md text-label-md text-on-surface truncate">{{ \App\Support\Prikaz::stavka($stavka->naziv_stavke) }}</div>
+            <div class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ $stavka->checklist->building->naziv }} · {{ \App\Support\Prikaz::label($stavka->checklist->tip_checkliste) }}</div>
           </div>
-          <a href="{{ route('checklists.show', ['building' => $stavka->checklist->zgrada_id, 'tip' => $stavka->checklist->tip_checkliste]) }}" class="self-end sm:self-center shrink-0 px-space-md py-1 bg-surface-container-lowest text-on-surface hover:bg-primary hover:text-on-primary rounded font-label-sm text-label-sm font-semibold shadow-sm transition-colors">Otvori</a>
         </div>
-        @empty
-        <div class="p-space-md text-center text-on-surface-variant font-body-sm">Sve checklist stavke su rešene.</div>
-        @endforelse
-      </div>
+        <span class="material-symbols-outlined text-[18px] text-on-surface-variant group-hover:text-on-surface">chevron_right</span>
+      </a>
+      @empty
+      <x-prazno ikonica="task_alt" naslov="Sve je na mestu" tekst="Nijedna checklist stavka ne nedostaje." />
+      @endforelse
     </div>
-  </div>
+  </section>
+
+  {{-- Reklamacije kojima je rok prošao ili ističe za 7 dana --}}
+  <section class="kartica overflow-hidden" aria-label="Hitne reklamacije">
+    <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+      <div class="flex items-center gap-space-sm">
+        <span class="w-6 h-6 rounded bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center"><span class="material-symbols-outlined text-[16px]">schedule</span></span>
+        <h2 class="font-headline-sm text-headline-sm">Reklamacije sa rokom</h2>
+      </div>
+      <a href="{{ route('claims.index', ['status' => 'otvorene']) }}" class="dugme-tiho dugme-malo">Sve reklamacije<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+    </div>
+    <div class="px-space-sm pb-space-sm flex flex-col gap-1">
+      @forelse($hitneReklamacije as $rek)
+      @php $rok = \App\Support\Prikaz::rok($rek); @endphp
+      <a href="{{ route('claims.show', $rek) }}" class="group flex items-center justify-between gap-space-md px-space-md py-2.5 rounded bg-surface-container-low hover:bg-surface-container transition-colors">
+        <div class="flex items-center gap-space-sm min-w-0">
+          <span class="material-symbols-outlined text-[18px] text-on-surface-variant">{{ \App\Support\Prikaz::ikonaProblema($rek->tip_problema) }}</span>
+          <div class="min-w-0">
+            <div class="font-label-md text-label-md text-on-surface truncate">{{ $rek->unit->oznaka ?? '—' }} · {{ \App\Support\Prikaz::label($rek->tip_problema) }}</div>
+            <div class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ $rek->unit->building->naziv ?? '' }} · rok {{ $rek->rok_resavanja->format('d.m.Y.') }}</div>
+          </div>
+        </div>
+        @if($rok)<span class="font-label-md text-label-md whitespace-nowrap {{ $rok[1] }}">{{ $rok[0] }}</span>@endif
+      </a>
+      @empty
+      <x-prazno ikonica="event_available" naslov="Nema hitnih reklamacija" tekst="Nijednoj otvorenoj reklamaciji rok ne ističe u narednih 7 dana." />
+      @endforelse
+    </div>
+  </section>
 </div>
 
 @include('projects._modal_novi')

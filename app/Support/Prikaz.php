@@ -32,6 +32,15 @@ class Prikaz
         'Upotrebna_dozvola' => 'Upotrebna dozvola',
         'Uknjizba' => 'Uknjižba',
         'Paket_za_banku' => 'Paket za banku',
+        // Tipovi dokumenata
+        'Gradjevinska_dozvola' => 'Građevinska dozvola',
+        'Lokacijski_uslovi' => 'Lokacijski uslovi',
+        'Projekat_za_dozvolu' => 'Projekat za dozvolu',
+        'Projekat_izvedenog_stanja' => 'Projekat izvedenog stanja',
+        'Energetski_pasos' => 'Energetski pasoš',
+        'Ugovor_sa_kupcem' => 'Ugovor sa kupcem',
+        'Zapisnik_primopredaje_stana' => 'Zapisnik primopredaje stana',
+        'Dokument_o_kretanju_otpada' => 'Dokument o kretanju otpada',
         // Korisnici
         'Nadzor_izvodjac' => 'Nadzor / izvođač',
         'Pozvan_ceka_aktivaciju' => 'Pozvan · čeka aktivaciju',
@@ -71,6 +80,46 @@ class Prikaz
             }
         }
         return 'neutralno';
+    }
+
+    /** Ikonica za tip problema reklamacije. */
+    private const IKONE_PROBLEMA = [
+        'Vodovod' => 'water_drop',
+        'Elektro_instalacije' => 'bolt',
+        'Grejanje_klima' => 'hvac',
+        'Stolarija' => 'window',
+        'Podovi_zavrsne_obrade' => 'grid_on',
+        'Zidovi_fasada' => 'format_paint',
+    ];
+
+    public static function ikonaProblema(?string $tip): string
+    {
+        return self::IKONE_PROBLEMA[$tip] ?? 'build';
+    }
+
+    /** Naziv stavke checkliste bez tehničkog sufiksa "dodat" ("Geodetski elaborat dodat" → "Geodetski elaborat"). */
+    public static function stavka(?string $naziv): string
+    {
+        return preg_replace('/\s+dodat[a-z]?$/u', '', (string) $naziv);
+    }
+
+    /**
+     * Rok rešavanja reklamacije u rečima: [tekst, klasa boje] ili null ako rok nije zadat / reklamacija je zatvorena.
+     * Čisto oduzimanje datuma (PRD 2.2) — bez tumačenja zakonskih rokova.
+     */
+    public static function rok($reklamacija): ?array
+    {
+        if (!$reklamacija->rok_resavanja || in_array($reklamacija->status, ['Resena', 'Odbijena'], true)) {
+            return null;
+        }
+        $dana = (int) now()->startOfDay()->diffInDays($reklamacija->rok_resavanja->copy()->startOfDay(), false);
+        if ($dana < 0) {
+            return ['Kasni '.abs($dana).' '.(abs($dana) === 1 ? 'dan' : 'dana'), 'text-error'];
+        }
+        if ($dana === 0) {
+            return ['Ističe danas', 'text-error'];
+        }
+        return ['Još '.$dana.' '.($dana === 1 ? 'dan' : 'dana'), $dana <= 3 ? 'text-amber-700' : 'text-on-surface-variant'];
     }
 
     /** Za JavaScript (panel stana): labele i tonovi svih poznatih vrednosti. */

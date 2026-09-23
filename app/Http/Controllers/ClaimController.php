@@ -29,7 +29,16 @@ class ClaimController extends Controller
             $query->whereHas('unit', fn ($q) => $q->where('zgrada_id', $zgradaId));
         }
         if ($status = $request->get('status')) {
-            $query->where('status', $status);
+            // Grupe: "otvorene" = nisu rešene ni odbijene; "u_radu" = u obradi ili dodeljene
+            match ($status) {
+                'otvorene' => $query->whereNotIn('status', ['Resena', 'Odbijena']),
+                'u_radu' => $query->whereIn('status', ['U_obradi', 'Dodeljena']),
+                default => $query->where('status', $status),
+            };
+        }
+        if ($request->get('rok') === 'kasni') {
+            $query->whereNotIn('status', ['Resena', 'Odbijena'])
+                ->whereNotNull('rok_resavanja')->where('rok_resavanja', '<', now()->toDateString());
         }
         if ($tip = $request->get('tip')) {
             $query->where('tip_problema', $tip);
@@ -54,30 +63,44 @@ class ClaimController extends Controller
             'prekoracen_rok' => (clone $osnovniQuery)->whereNotIn('status', ['Resena', 'Odbijena'])
                 ->whereNotNull('rok_resavanja')->where('rok_resavanja', '<', now()->toDateString())->count(),
             'resene_mesec' => (clone $osnovniQuery)->where('status', 'Resena')
-                ->whereMonth('updated_at', now()->month)->count(),
+                ->whereYear('updated_at', now()->year)->whereMonth('updated_at', now()->month)->count(),
         ];
 
-        // Izabrana reklamacija za detaljni prikaz
-        $izabrana = null;
-        if ($id = $request->get('reklamacija')) {
-            $izabrana = $reklamacije->firstWhere('id', (int) $id) ?? $reklamacije->first();
-        } else {
-            $izabrana = $reklamacije->first();
-        }
-
-        if ($izabrana) {
-            $izabrana->load('notes.user', 'files', 'customer', 'unit.building.project');
-        }
-
-        $zgrade = \App\Models\Building::where('arhiviran', false)->get();
-        $nadzorUsers = User::where('uloga', 'Nadzor_izvodjac')->where('status_naloga', 'Aktivan')->get();
+        $zgrade = \App\Models\Building::where('arhiviran', false)->orderBy('naziv')->get();
         $stanovi = Unit::with('building')->where('arhiviran', false)->orderBy('oznaka')->get();
         $statusi = config('statusi.status_reklamacije');
         $tipovi = config('statusi.tip_problema');
 
         return view('claims.index', compact(
-            'reklamacije', 'metrike', 'izabrana', 'zgrade', 'nadzorUsers', 'stanovi', 'statusi', 'tipovi'
+            'reklamacije', 'metrike', 'zgrade', 'stanovi', 'statusi', 'tipovi'
         ));
+    }
+
+    // Detalj reklamacije na zasebnoj stranici (umesto bočnog panela)
+    public function show(Claim $claim)
+    {
+        $user = auth()->user();
+        abort_if($user->jeNadzor() && $claim->odgovorni_id !== $user->id, 403);
+
+        $claim->load('notes.user', 'files', 'customer', 'odgovorni', 'unit.building.project', 'unit.customer');
+
+        return view('claims.show', [
+            'rek' => $claim,
+            'statusi' => config('statusi.status_reklamacije'),
+            'nadzorUsers' => User::where('uloga', 'Nadzor_izvodjac')->where('status_naloga', 'Aktivan')->orderBy('ime_prezime')->get(),
+        ]);
+    }
+
+    // Prikaz priloženog fajla (fotografija / PDF) — samo za korisnike koji vide tu reklamaciju
+    public function prilog(\App\Models\ClaimFile $file)
+    {
+        $claim = Claim::find($file->claim_id); // tenant filter: druga firma dobija 404
+        abort_unless($claim, 404);
+        $user = auth()->user();
+        abort_if($user->jeNadzor() && $claim->odgovorni_id !== $user->id, 403);
+        abort_unless(Storage::disk('documents')->exists($file->putanja_fajla), 404);
+
+        return Storage::disk('documents')->response($file->putanja_fajla, $file->originalni_naziv);
     }
 
     // PRD 10.3: interni unos reklamacije u ime kupca
@@ -114,7 +137,7 @@ class ClaimController extends Controller
             'stan_id' => $reklamacija->stan_id, 'tip' => $reklamacija->tip_problema,
         ]);
 
-        return redirect()->route('claims.index', ['reklamacija' => $reklamacija->id])
+        return redirect()->route('claims.show', $reklamacija)
             ->with('uspesno', 'Reklamacija je evidentirana u statusu "Prijavljena".');
     }
 
@@ -134,11 +157,17 @@ class ClaimController extends Controller
             abort_unless($claim->odgovorni_id === $user->id, 403);
             $claim->update(['status' => $data['status'] ?? $claim->status]);
         } else {
-            $claim->update(array_filter([
-                'status' => $data['status'] ?? null,
-                'odgovorni_id' => $data['odgovorni_id'] ?? null,
-                'rok_resavanja' => $data['rok_resavanja'] ?? null,
-            ], fn ($v) => $v !== null));
+            // Polja poslata iz forme se upisuju i kad su prazna (npr. "Nedodeljeno" skida odgovornog)
+            $izmene = [];
+            if (!empty($data['status'])) {
+                $izmene['status'] = $data['status'];
+            }
+            foreach (['odgovorni_id', 'rok_resavanja'] as $polje) {
+                if ($request->exists($polje)) {
+                    $izmene[$polje] = $data[$polje] ?? null;
+                }
+            }
+            $claim->update($izmene);
         }
 
         AuditLog::zabelezi('izmena_reklamacije', $claim, array_filter($data));

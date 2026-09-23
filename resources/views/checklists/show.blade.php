@@ -1,127 +1,107 @@
+@use('App\Support\Prikaz')
 @extends('layouts.app')
+@section('naslov', Prikaz::label($checklist->tip_checkliste).' · '.$building->naziv)
 
 @section('content')
-@php $procenat = $checklist->ukupno > 0 ? round($checklist->reseno / $checklist->ukupno * 100) : 0; @endphp
-<div class="flex flex-col gap-space-lg w-full max-w-7xl mx-auto pt-space-xs">
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
-    <div class="flex items-center gap-space-md">
-      <a href="{{ route('projects.show', ['project' => $building->projekat_id, 'tab' => 'checkliste']) }}" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">arrow_back</span></a>
-      <div>
-        <div class="flex items-center gap-space-sm">
-          <span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-medium">Dosije Objekta</span>
-          <span class="font-label-xs text-label-xs uppercase px-1.5 py-0.5 rounded bg-surface-container-high text-secondary font-medium">Interni Registar</span>
-        </div>
-        <h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">{{ $building->naziv }} — {{ \App\Support\Prikaz::label($checklist->tip_checkliste) }}</h1>
-      </div>
+@php
+  $ukupno = $checklist->items->count();
+  $reseno = $checklist->items->where('zavrseno', true)->count();
+  $procenat = $ukupno > 0 ? round($reseno / $ukupno * 100) : 0;
+  $kompletno = $ukupno > 0 && $reseno === $ukupno;
+  $mozeMenjati = $currentUser->mozeUredjivati();
+  $putanja = ['Checkliste' => route('checklists.index')];
+  if ($building->project) { $putanja[$building->project->naziv] = route('projects.show', ['project' => $building->project, 'zgrada' => $building->id, 'tab' => 'checkliste']); }
+  $putanja[$building->naziv] = null;
+@endphp
+
+<x-zaglavlje :naslov="Prikaz::label($checklist->tip_checkliste)" :putanja="$putanja" :opis="'Zgrada '.$building->naziv.' — dokumenta potrebna za predaju zahteva.'">
+  <x-slot:uzNaslov>
+    <span class="cip {{ $kompletno ? 'bg-emerald-50 text-emerald-800' : 'bg-tertiary-fixed text-on-tertiary-fixed' }}">{{ $kompletno ? 'Spremno za predaju' : 'U toku' }}</span>
+  </x-slot:uzNaslov>
+  <button type="button" onclick="window.print()" class="dugme-sekundarno ne-stampaj"><span class="material-symbols-outlined text-[18px]">print</span>Štampaj</button>
+</x-zaglavlje>
+
+{{-- Izbor jedne od 3 fiksne checkliste zgrade --}}
+<nav class="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-surface-container-low self-start ne-stampaj" aria-label="Checkliste zgrade">
+  @foreach($tipovi as $t)
+  @php $c = $sveCheckliste->firstWhere('tip_checkliste', $t); $aktivna = $tip === $t; @endphp
+  <a href="{{ route('checklists.show', ['building' => $building, 'tip' => $t]) }}" @if($aktivna) aria-current="page" @endif
+     class="inline-flex items-center gap-1.5 h-8 px-space-md rounded font-label-md text-label-md transition-colors {{ $aktivna ? 'bg-surface-container-lowest text-on-surface font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container' }}">
+    {{ Prikaz::label($t) }}
+    <span class="cip {{ $c && $c->ukupno_stavki && $c->reseno_stavki === $c->ukupno_stavki ? 'bg-emerald-50 text-emerald-800' : 'bg-surface-container text-on-surface-variant' }}">{{ $c->reseno_stavki ?? 0 }}/{{ $c->ukupno_stavki ?? 0 }}</span>
+  </a>
+  @endforeach
+</nav>
+
+<section class="kartica overflow-hidden">
+  {{-- Napredak (dozvoljena automatika: zbir stavki, PRD 9.4) --}}
+  <div class="px-space-lg py-space-md flex flex-col gap-space-sm border-b border-surface-container">
+    <div class="flex items-center justify-between font-body-md text-body-md">
+      <span class="text-on-surface-variant">Napredak</span>
+      <span class="font-semibold font-mono-num">{{ $reseno }} / {{ $ukupno }} stavki rešeno ({{ $procenat }}%)</span>
     </div>
+    <div class="h-2 rounded-full bg-surface-container overflow-hidden"><div class="h-full rounded-full {{ $kompletno ? 'bg-emerald-500' : 'bg-primary' }}" style="width: {{ $procenat }}%"></div></div>
   </div>
 
-  <!-- Proces selektor (3 fiksne checkliste) -->
-  <div class="flex items-center gap-space-xs p-1 rounded-xl bg-surface-container-low max-w-fit overflow-x-auto">
-    @foreach($tipovi as $tipC)
-    <a href="{{ route('checklists.show', ['building' => $building, 'tip' => $tipC]) }}" class="flex items-center gap-space-sm px-space-md h-8 rounded-lg font-body-sm text-body-sm transition-all whitespace-nowrap {{ $tip === $tipC ? 'bg-surface-container-lowest text-on-surface font-semibold shadow-sm' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-medium' }}">
-      <span class="material-symbols-outlined text-[18px] {{ $tip === $tipC ? 'text-secondary' : '' }}">{{ $tipC === 'Upotrebna_dozvola' ? 'verified' : ($tipC === 'Uknjizba' ? 'account_balance' : 'real_estate_agent') }}</span>
-      <span>{{ \App\Support\Prikaz::label($tipC) }}</span>
-      <span class="font-label-xs text-label-xs px-1.5 py-0.2 rounded {{ $tip === $tipC ? 'bg-surface-container-high text-on-surface-variant' : 'bg-surface-container text-on-surface-variant' }}">{{ $sveCheckliste->firstWhere('tip_checkliste', $tipC)?->reseno ?? 0 }}/{{ $sveCheckliste->firstWhere('tip_checkliste', $tipC)?->ukupno ?? 0 }}</span>
-    </a>
-    @endforeach
-  </div>
-
-  <!-- Napomena o strogo rucnoj overi (PRD 2) -->
-  <div class="flex items-center justify-between p-space-md rounded-xl bg-surface-container-low text-on-surface shadow-sm gap-space-md">
-    <div class="flex items-center gap-space-md">
-      <div class="p-2 rounded-lg bg-surface-container text-secondary"><span class="material-symbols-outlined text-[20px]">info</span></div>
-      <div class="flex flex-col">
-        <span class="font-body-md text-body-md font-semibold">Protokol ručne overe administratora (Strogo interno)</span>
-        <span class="font-body-sm text-body-sm text-on-surface-variant">Ovaj modul ne vrši automatsku validaciju niti je integrisan sa CEOP/opštinom. Status zavisi isključivo od neposredne revizije ovlašćenog rukovodioca.</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Progress (dozvoljena automatika: zbir stavki, PRD 9.4) -->
-  <div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
-      <div class="flex items-baseline gap-space-sm">
-        <span class="font-label-md text-label-md font-semibold text-on-surface">{{ $checklist->reseno }} / {{ $checklist->ukupno }} stavki rešeno</span>
-        <span class="font-label-sm text-label-sm text-on-surface-variant">({{ $procenat }}%)</span>
-      </div>
-      <div class="flex items-center gap-space-md">
-        <span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant">Spremno za predaju zahteva:</span>
-        @if($checklist->reseno === $checklist->ukupno)
-        <span class="font-label-sm text-label-sm font-semibold text-on-tertiary-container flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-on-tertiary-container"></span>SPREMNO ZA PREDAJU</span>
-        @else
-        <span class="font-label-sm text-label-sm font-semibold text-error flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-error"></span>NEKOMPLETNO</span>
-        @endif
-      </div>
-    </div>
-    <div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
-      <div class="h-full rounded-full transition-all duration-300 {{ $checklist->reseno === $checklist->ukupno ? 'bg-on-tertiary-container' : 'bg-secondary' }}" style="width: {{ $procenat }}%;"></div>
-    </div>
-  </div>
-
-  <!-- Stavke checkliste -->
-  <div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
-    <div class="flex items-center justify-between pb-space-sm">
-      <div>
-        <h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Obavezna dokumentacija — {{ \App\Support\Prikaz::label($checklist->tip_checkliste) }}</h2>
-        <p class="font-body-sm text-body-sm text-on-surface-variant">Dokumenti potrebni za formiranje tehničkog dosijea zgrade.</p>
-      </div>
-      <span class="font-label-xs text-label-xs text-on-surface-variant">Ručna overa: {{ $currentUser->ime_prezime }}</span>
-    </div>
-    <div class="flex flex-col gap-space-sm">
-      @foreach($checklist->items as $index => $stavka)
-      <div class="p-space-md rounded-xl transition-colors flex flex-col md:flex-row md:items-center justify-between gap-space-md {{ $stavka->zavrseno ? 'bg-surface-container-low' : 'bg-surface-container-lowest shadow-sm' }}">
-        <div class="flex items-start md:items-center gap-space-md flex-1 min-w-0">
-          <form method="POST" action="{{ route('checklists.toggle', $stavka) }}" class="mt-0.5 md:mt-0">
-            @csrf @method('PATCH')
-            <button type="submit" title="Označi kao završeno (ručno)" class="w-5 h-5 rounded flex items-center justify-center transition-all {{ $stavka->zavrseno ? 'bg-primary text-on-primary' : 'bg-surface-container hover:bg-surface-container-high' }}">
-              <span class="material-symbols-outlined text-[16px]">{{ $stavka->zavrseno ? 'check' : '' }}</span>
-            </button>
-          </form>
-          <div class="flex items-center justify-center shrink-0">
+  <ol class="flex flex-col">
+    @foreach($checklist->items as $i => $stavka)
+    @php
+      $dok = $stavka->povezani_tip_dokumenta ? ($dokumentiPoTipu[$stavka->povezani_tip_dokumenta] ?? null) : null;
+    @endphp
+    <li class="px-space-lg py-space-md flex flex-col md:flex-row md:items-center justify-between gap-space-md {{ $i > 0 ? 'border-t border-surface-container' : '' }} hover:bg-surface-container-low/40 transition-colors">
+      <div class="flex items-start gap-space-md min-w-0">
+        {{-- Ručno štikliranje (PRD 6.6 / 2.3) — nezavisno od postojanja dokumenta --}}
+        <form method="POST" action="{{ route('checklists.toggle', $stavka) }}" class="pt-0.5">
+          @csrf @method('PATCH')
+          <button type="submit" @disabled(!$mozeMenjati) title="{{ $stavka->zavrseno ? 'Vrati u nezavršene' : 'Označi kao završeno' }}"
+                  class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors {{ $stavka->zavrseno ? 'bg-primary border-primary text-on-primary' : 'border-outline bg-surface-container-lowest hover:border-primary' }} disabled:opacity-50">
+            @if($stavka->zavrseno)<span class="material-symbols-outlined text-[16px]">check</span>@endif
+          </button>
+        </form>
+        <div class="flex flex-col gap-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-space-sm">
+            <span class="font-label-md text-label-md font-semibold">{{ $i + 1 }}. {{ Prikaz::stavka($stavka->naziv_stavke) }}</span>
             @if($stavka->zavrseno)
-            <span class="w-7 h-7 rounded-full bg-surface-container-high flex items-center justify-center text-on-tertiary-container" title="Završeno i overeno"><span class="material-symbols-outlined text-[18px]">check_circle</span></span>
+              <span class="cip bg-emerald-50 text-emerald-800"><span class="material-symbols-outlined text-[14px]">check_circle</span>Završeno</span>
             @else
-            <span class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">radio_button_unchecked</span></span>
+              <span class="cip bg-error-container/60 text-on-error-container"><span class="material-symbols-outlined text-[14px]">cancel</span>Nedostaje</span>
             @endif
           </div>
-          <div class="flex flex-col min-w-0">
-            <div class="flex items-center gap-space-sm flex-wrap">
-              <span class="font-body-md text-body-md font-semibold text-on-surface">Stavka {{ $index + 1 }}: {{ $stavka->naziv_stavke }}</span>
-              @if($stavka->zavrseno)
-              <span class="font-label-xs text-label-xs uppercase px-1.5 py-0.5 rounded bg-surface-container text-on-tertiary-container font-semibold">Završeno</span>
-              @else
-              <span class="font-label-xs text-label-xs uppercase px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-medium">Nezavršeno</span>
-              @endif
+          @if($dok)
+            <div class="flex flex-wrap items-center gap-x-space-sm gap-y-0.5 font-body-sm text-body-sm text-on-surface-variant">
+              <span class="material-symbols-outlined text-[16px]">description</span>
+              <span class="font-medium text-on-surface">{{ $dok->naziv }}</span>
+              <span class="cip bg-surface-container text-on-surface">v{{ $dok->verzija }}</span>
+              @if($dok->datum_izdavanja)<span>· izdat {{ $dok->datum_izdavanja->format('d.m.Y.') }}</span>@endif
+              @unless($stavka->zavrseno)<span class="text-secondary font-medium">· dokument postoji — potvrdite kvačicom</span>@endunless
             </div>
-            @if(!$stavka->zavrseno)
-            <span class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
-              @if($stavka->predlog_zavrseno)
-              <span class="text-on-tertiary-container font-medium">Vizuelni predlog:</span> postoji dokument tipa [{{ \App\Support\Prikaz::label($stavka->povezani_tip_dokumenta) }}] — potvrdite kvačicom ili priložite.
-              @else
-              Nedostaje fajl tipa [{{ \App\Support\Prikaz::label($stavka->povezani_tip_dokumenta) }}]. Potrebno je ručno priložiti dokument ili štiklirati stavku.
-              @endif
-            </span>
-            @endif
-          </div>
-        </div>
-        <div class="flex items-center gap-space-sm shrink-0 self-end md:self-center pl-10 md:pl-0">
-          @if(!$stavka->zavrseno)
-          <a href="{{ route('projects.show', ['project' => $building->projekat_id, 'tab' => 'dokumentacija']) }}" class="px-space-md h-8 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-secondary font-body-sm text-body-sm font-semibold shadow-sm transition-colors flex items-center gap-space-xs">
-            <span class="material-symbols-outlined text-[16px]">add</span><span>+ Dodaj dokument</span>
-          </a>
+          @elseif(!$stavka->zavrseno)
+            <div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+              <span class="material-symbols-outlined text-[16px] text-error">warning</span>
+              Nije priložen dokument tipa „{{ Prikaz::label($stavka->povezani_tip_dokumenta) }}“. Priložite ga ili stavku potvrdite ručno.
+            </div>
           @endif
         </div>
       </div>
-      @endforeach
-    </div>
-  </div>
+      <div class="flex items-center gap-space-sm shrink-0 self-end md:self-center ne-stampaj">
+        @if($dok && $dok->imaFajl())
+          <a href="{{ route('documents.download', $dok) }}" class="dugme-sekundarno dugme-malo"><span class="material-symbols-outlined text-[16px]">download</span>Preuzmi</a>
+        @endif
+        @if(!$dok && $stavka->povezani_tip_dokumenta)
+          <button type="button" class="dugme-primarno dugme-malo" data-modal-open="modal-dokument" data-postavi='@json(['tip' => $stavka->povezani_tip_dokumenta])'>
+            <span class="material-symbols-outlined text-[16px]">add</span>Dodaj dokument
+          </button>
+        @endif
+      </div>
+    </li>
+    @endforeach
+  </ol>
+</section>
 
-  <!-- Kontekst objekta -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
-    <div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-1"><span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant">Objekat</span><span class="font-body-md text-body-md font-semibold text-on-surface">{{ $building->naziv }}</span><span class="font-body-sm text-body-sm text-on-surface-variant">{{ $building->project->naziv ?? '' }}</span></div>
-    <div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-1"><span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant">Status zgrade</span><span><x-status :v="$building->status" /></span></div>
-    <div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-1"><span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant">Broj jedinica</span><span class="font-body-md text-body-md font-semibold text-on-surface">{{ $building->units()->count() }}</span></div>
-  </div>
+<div class="p-space-md rounded-lg bg-surface-container-low flex items-start gap-space-md">
+  <span class="material-symbols-outlined text-[20px] text-on-surface-variant">info</span>
+  <p class="font-body-md text-body-md text-on-surface-variant"><strong class="text-on-surface font-semibold">Ručna potvrda.</strong> Štikliranje stavke je administrativna potvrda vašeg tima. Sistem ne proverava pravnu ispravnost dokumenata niti rokove.</p>
 </div>
+
+@include('documents._modal', ['zgrada' => $building])
 @endsection

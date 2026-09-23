@@ -1,397 +1,406 @@
+@use('App\Support\Prikaz')
 @extends('layouts.app')
+@section('naslov', $project->naziv)
 
 @section('content')
 @php
-  $tabovi = ['pregled' => 'Pregled', 'dokumentacija' => 'Dokumentacija', 'stanovi' => 'Stanovi', 'checkliste' => 'Checkliste', 'reklamacije' => 'Reklamacije'];
-  $ikoneTabova = ['pregled' => 'info', 'dokumentacija' => 'folder_open', 'stanovi' => 'apartment', 'checkliste' => 'fact_check', 'reklamacije' => 'assignment_late'];
-  $milestoneKoraci = config('statusi.milestone_koraci');
-  $milestonePozicija = config('statusi.milestone_map')[$project->status] ?? 1;
+  $koraci = config('statusi.milestone_koraci');
+  $faza = config('statusi.milestone_map')[$project->status] ?? 1;
+  $url = fn ($t, $extra = []) => route('projects.show', array_merge(['project' => $project, 'tab' => $t], $zgrada ? ['zgrada' => $zgrada->id] : [], $extra));
+  $otvorene = $reklamacije->whereNotIn('status', ['Resena', 'Odbijena']);
+  if ($zgrada) { $stanovi->each->setRelation('building', $zgrada); }
+  $tabovi = [
+    'pregled' => ['Pregled', 'dashboard', null],
+    'dokumentacija' => ['Dokumentacija', 'folder_open', $dokumenti->count()],
+    'stanovi' => ['Stanovi', 'door_front', $stanovi->count()],
+    'checkliste' => ['Checkliste', 'fact_check', $checkliste->sum('reseno_stavki').'/'.$checkliste->sum('ukupno_stavki')],
+    'reklamacije' => ['Reklamacije', 'build_circle', $otvorene->count()],
+  ];
+  $opis = collect([Prikaz::label($project->tip), trim(($project->lokacija_adresa ? $project->lokacija_adresa.', ' : '').($project->lokacija_grad ?? ''), ', ')])->filter(fn ($v) => $v && $v !== '—')->implode(' · ');
 @endphp
 
-<div class="flex flex-col gap-space-lg w-full max-w-7xl mx-auto pt-space-xs">
-
-  <!-- Zaglavlje dosijea + status selektor (rucna promena, PRD 2.3) -->
-  <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
-    <div class="flex flex-col gap-space-xs">
-      <div class="flex items-center gap-space-sm flex-wrap">
-        <span class="font-label-xs text-label-xs uppercase px-space-xs py-0.5 rounded bg-surface-container-high text-on-surface font-semibold tracking-wider">Dosije Projekta</span>
-        <span class="font-label-xs text-label-xs text-on-surface-variant font-mono">{{ $project->lokacija_adresa }}{{ $project->lokacija_grad ? ', '.$project->lokacija_grad : '' }}</span>
-      </div>
-      <h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">{{ $project->naziv }}</h1>
-      <p class="font-body-sm text-body-sm text-on-surface-variant">
-        {{ $zgrada ? 'Zgrada: '.$zgrada->naziv.' · Status zgrade: '.\App\Support\Prikaz::label($zgrada->status) : 'Zgrada još nije dodata — dodajte prvu zgradu da biste vodili dosije.' }}
-      </p>
-    </div>
-    <div class="flex flex-col sm:flex-row sm:items-center gap-space-sm bg-surface-container-low p-space-sm rounded-lg">
-      <label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold whitespace-nowrap" for="building-status-select">Status projekta:</label>
-      <form method="POST" action="{{ route('projects.update', $project) }}" class="relative inline-block">
-        @csrf @method('PATCH')
-        <select name="status" onchange="this.form.submit()" class="h-8 pl-space-sm pr-8 bg-surface-container-lowest text-on-surface font-label-md text-label-md rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer appearance-none">
-          @foreach($statusiProjekta as $status)
-          <option value="{{ $status }}" {{ $project->status === $status ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($status) }}</option>
-          @endforeach
-        </select>
-        <input type="hidden" name="naziv" value="{{ $project->naziv }}">
-        <input type="hidden" name="lokacija_adresa" value="{{ $project->lokacija_adresa }}">
-        <input type="hidden" name="lokacija_grad" value="{{ $project->lokacija_grad }}">
-        <input type="hidden" name="tip" value="{{ $project->tip }}">
-        <input type="hidden" name="broj_planiranih_stanova" value="{{ $project->broj_planiranih_stanova }}">
-        <input type="hidden" name="datum_pocetka_gradnje" value="{{ $project->datum_pocetka_gradnje?->format('Y-m-d') }}">
-        <input type="hidden" name="planirani_datum_zavrsetka" value="{{ $project->planirani_datum_zavrsetka?->format('Y-m-d') }}">
-        <span class="material-symbols-outlined pointer-events-none absolute right-2 top-2 text-on-surface-variant text-[16px]">arrow_drop_down</span>
-      </form>
-    </div>
-  </div>
-
-  @if(!$zgrada)
-  <!-- Empty state: prva zgrada (PRD 10.1) -->
-  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col items-center gap-space-md text-center">
-    <span class="material-symbols-outlined text-[40px] text-on-surface-variant">domain</span>
-    <div>
-      <h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Dodajte prvu zgradu projekta</h2>
-      <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Bez zgrade nema dosijea, checklisti ni evidencije stanova. Ovo je jedini sledeći korak.</p>
-    </div>
-    <form method="POST" action="{{ route('buildings.store', $project) }}" class="flex flex-col sm:flex-row gap-space-sm w-full max-w-md">
-      @csrf
-      <input name="naziv" required placeholder="Naziv zgrade (npr. Blok A / Lamela 1)" class="flex-1 h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-secondary"/>
-      <input name="broj_stanova" type="number" min="1" placeholder="Br. stanova" class="w-28 h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/>
-      <button class="h-9 px-space-lg bg-primary text-on-primary rounded-lg font-body-sm font-semibold shadow-sm hover:bg-primary-container">+ Dodaj zgradu</button>
+<x-zaglavlje :naslov="$project->naziv" :putanja="['Projekti i zgrade' => route('projects.index'), $project->naziv => null]" :opis="$opis ?: null">
+  <x-slot:uzNaslov>
+    {{-- Ručna promena statusa projekta (PRD 2.3) --}}
+    <form method="POST" action="{{ route('projects.update', $project) }}">
+      @csrf @method('PATCH')
+      @foreach(['naziv', 'lokacija_adresa', 'lokacija_grad', 'tip', 'broj_planiranih_stanova'] as $polje)
+      <input type="hidden" name="{{ $polje }}" value="{{ $project->$polje }}">
+      @endforeach
+      <input type="hidden" name="datum_pocetka_gradnje" value="{{ $project->datum_pocetka_gradnje?->format('Y-m-d') }}">
+      <input type="hidden" name="planirani_datum_zavrsetka" value="{{ $project->planirani_datum_zavrsetka?->format('Y-m-d') }}">
+      <label class="sr-only" for="status-projekta">Status projekta</label>
+      <select id="status-projekta" name="status" data-auto-submit class="polje h-8 w-auto font-label-md text-label-md {{ Prikaz::KLASE[Prikaz::ton($project->status)][0] }} border-transparent" title="Promeni status projekta">
+        @foreach($statusiProjekta as $st)<option value="{{ $st }}" @selected($project->status === $st)>{{ Prikaz::label($st) }}</option>@endforeach
+      </select>
     </form>
-  </div>
-  @endif
-
+  </x-slot:uzNaslov>
+  <button type="button" data-modal-open="modal-izmena-projekta" class="dugme-sekundarno"><span class="material-symbols-outlined text-[18px]">edit</span>Uredi projekat</button>
   @if($zgrada)
-  <!-- Tab navigacija (tacno 5 tabova, PRD 9.2) -->
-  <div class="bg-surface-container-lowest rounded-t-xl shadow-sm px-space-md pt-space-xs flex items-center gap-1 overflow-x-auto -mb-space-md">
-    @foreach($tabovi as $kljuc => $naziv)
-    <a href="{{ route('projects.show', ['project' => $project, 'tab' => $kljuc]) }}" class="px-space-lg py-3 font-label-md text-label-md flex items-center gap-space-xs rounded-t-lg transition-colors {{ $tab === $kljuc ? 'text-on-surface font-semibold bg-surface-container-low' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low' }}">
-      <span class="material-symbols-outlined text-[18px]">{{ $ikoneTabova[$kljuc] }}</span><span>{{ $naziv }}</span>
-      @if($kljuc === 'dokumentacija')<span class="ml-1 px-1.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface font-mono text-[10px]">{{ $dokumenti->count() }}</span>@endif
-      @if($kljuc === 'stanovi')<span class="ml-1 px-1.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface font-mono text-[10px]">{{ $zgrada->units->count() }}</span>@endif
+  <button type="button" data-modal-open="modal-dokument" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Dodaj dokument</button>
+  @endif
+</x-zaglavlje>
+
+@if(!$zgrada)
+  {{-- Prvi korak posle kreiranja projekta: zgrada (PRD 10.1) --}}
+  <section class="kartica">
+    <x-prazno ikonica="domain_add" naslov="Dodajte prvu zgradu" tekst="Dosije, stanovi, checkliste i reklamacije vode se po zgradi (lamela, blok). Dodajte bar jednu.">
+      <form method="POST" action="{{ route('buildings.store', $project) }}" class="flex flex-col sm:flex-row gap-space-sm w-full max-w-lg">
+        @csrf
+        <input name="naziv" required placeholder="Naziv zgrade (npr. Lamela A)" class="polje flex-1"/>
+        <input name="broj_stanova" type="number" min="1" placeholder="Br. stanova" class="polje sm:w-32"/>
+        <button class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Dodaj zgradu</button>
+      </form>
+    </x-prazno>
+  </section>
+@else
+
+{{-- Zgrade projekta: izbor zgrade čiji se dosije prikazuje --}}
+<section class="kartica px-space-md py-space-sm flex flex-wrap items-center gap-space-sm" aria-label="Zgrade projekta">
+  <span class="oznaka mr-1">Zgrada</span>
+  @foreach($project->buildings as $z)
+  @php $aktivna = $z->id === $zgrada->id; @endphp
+  <a href="{{ route('projects.show', ['project' => $project, 'zgrada' => $z->id, 'tab' => $tab]) }}"
+     class="inline-flex items-center gap-1.5 h-8 px-3 rounded font-label-md text-label-md transition-colors {{ $aktivna ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface hover:bg-surface-container' }}">
+    <span class="w-1.5 h-1.5 rounded-full {{ Prikaz::KLASE[Prikaz::ton($z->status)][1] }}"></span>
+    {{ $z->naziv }}
+    <span class="{{ $aktivna ? 'text-on-primary/70' : 'text-on-surface-variant' }} font-mono-num">{{ $z->units_count }}</span>
+  </a>
+  @endforeach
+  <div class="flex items-center gap-1 ml-auto">
+    <button type="button" data-modal-open="modal-izmena-zgrade" class="dugme-tiho dugme-malo"><span class="material-symbols-outlined text-[16px]">edit</span>Uredi zgradu</button>
+    <button type="button" data-modal-open="modal-nova-zgrada" class="dugme-tiho dugme-malo"><span class="material-symbols-outlined text-[16px]">add</span>Nova zgrada</button>
+  </div>
+</section>
+
+{{-- Tabovi dosijea (PRD 9.2) --}}
+<nav class="kartica px-space-sm flex items-center gap-1 overflow-x-auto" aria-label="Delovi dosijea">
+  @foreach($tabovi as $kljuc => [$naziv, $ikonica, $broj])
+  @php $aktivan = $tab === $kljuc; @endphp
+  <a href="{{ $url($kljuc) }}" @if($aktivan) aria-current="page" @endif
+     class="relative flex items-center gap-1.5 h-11 px-space-md font-label-md text-label-md whitespace-nowrap transition-colors border-b-2 {{ $aktivan ? 'border-primary text-on-surface font-semibold' : 'border-transparent text-on-surface-variant hover:text-on-surface' }}">
+    <span class="material-symbols-outlined text-[18px]">{{ $ikonica }}</span>{{ $naziv }}
+    @if($broj !== null)
+    <span class="cip {{ $kljuc === 'reklamacije' && $broj > 0 ? 'bg-error-container text-on-error-container' : 'bg-surface-container text-on-surface-variant' }}">{{ $broj }}</span>
+    @endif
+  </a>
+  @endforeach
+</nav>
+
+@if($tab === 'pregled')
+  {{-- 6 faza realizacije (PRD 9.2) — prikaz prema statusu projekta --}}
+  <section class="kartica p-space-lg flex flex-col gap-space-md" aria-label="Faze realizacije">
+    <div class="flex flex-wrap items-center justify-between gap-space-sm">
+      <h2 class="font-headline-sm text-headline-sm">Faze realizacije</h2>
+      <span class="cip bg-surface-container-low text-on-surface-variant">Faza {{ $faza }} od 6 · prema statusu projekta</span>
+    </div>
+    <ol class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-space-sm">
+      @foreach($koraci as $broj => $naziv)
+      @php $stanje = $broj < $faza ? 'gotovo' : ($broj === $faza ? 'tok' : 'ceka'); @endphp
+      <li class="p-space-md rounded flex flex-col gap-space-sm {{ $stanje === 'tok' ? 'bg-surface-container-highest' : ($stanje === 'gotovo' ? 'bg-surface-container-low' : 'bg-surface-container-low/60') }}">
+        <div class="flex items-center justify-between">
+          <span class="font-mono-num text-label-sm text-on-surface-variant">{{ str_pad($broj, 2, '0', STR_PAD_LEFT) }}</span>
+          @if($stanje === 'gotovo')
+            <span class="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">check</span></span>
+          @elseif($stanje === 'tok')
+            <span class="w-5 h-5 rounded-full bg-tertiary-fixed flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-on-tertiary-fixed"></span></span>
+          @else
+            <span class="w-5 h-5 rounded-full bg-surface-container"></span>
+          @endif
+        </div>
+        <span class="font-label-md text-label-md {{ $stanje === 'ceka' ? 'text-on-surface-variant' : 'text-on-surface font-semibold' }}">{{ $naziv }}</span>
+        <span class="cip self-start {{ $stanje === 'gotovo' ? 'bg-secondary-fixed text-on-secondary-fixed-variant' : ($stanje === 'tok' ? 'bg-tertiary-fixed text-on-tertiary-fixed' : 'bg-surface-container text-on-surface-variant') }}">{{ $stanje === 'gotovo' ? 'Završeno' : ($stanje === 'tok' ? 'U toku' : 'Nije započeto') }}</span>
+      </li>
+      @endforeach
+    </ol>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+    <div class="lg:col-span-5 flex flex-col gap-space-lg">
+      {{-- Osnovni podaci (PRD 6.2) --}}
+      <section class="kartica p-space-lg flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <h2 class="font-headline-sm text-headline-sm">Osnovni podaci</h2>
+          <button type="button" data-modal-open="modal-izmena-projekta" class="dugme-tiho dugme-malo"><span class="material-symbols-outlined text-[16px]">edit</span>Izmeni</button>
+        </div>
+        <div class="grid grid-cols-2 gap-space-sm">
+          @foreach([
+            ['Planirano stanova', $project->broj_planiranih_stanova ?: '—', 'za ceo projekat'],
+            ['Evidentirano jedinica', $stanovi->count(), 'u zgradi '.$zgrada->naziv],
+            ['Početak gradnje', $project->datum_pocetka_gradnje?->format('d.m.Y.') ?: '—', null],
+            ['Planirani završetak', $project->planirani_datum_zavrsetka?->format('d.m.Y.') ?: '—', null],
+          ] as [$l, $v, $o])
+          <div class="bg-surface-container-low p-space-md rounded flex flex-col gap-0.5">
+            <span class="oznaka">{{ $l }}</span>
+            <span class="font-headline-sm text-headline-sm font-mono-num">{{ $v }}</span>
+            @if($o)<span class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ $o }}</span>@endif
+          </div>
+          @endforeach
+        </div>
+        <dl class="flex flex-col divide-y divide-surface-container font-body-md text-body-md">
+          <div class="flex justify-between gap-space-md py-2"><dt class="text-on-surface-variant">Tip objekta</dt><dd class="font-medium text-right">{{ Prikaz::label($project->tip) }}</dd></div>
+          <div class="flex justify-between gap-space-md py-2"><dt class="text-on-surface-variant">Adresa</dt><dd class="font-medium text-right">{{ trim(($project->lokacija_adresa ? $project->lokacija_adresa.', ' : '').($project->lokacija_grad ?? ''), ', ') ?: '—' }}</dd></div>
+          <div class="flex justify-between gap-space-md py-2"><dt class="text-on-surface-variant">Zgrada {{ $zgrada->naziv }}</dt><dd><x-status :v="$zgrada->status" /></dd></div>
+          <div class="flex justify-between gap-space-md py-2"><dt class="text-on-surface-variant">Broj zgrada u projektu</dt><dd class="font-medium font-mono-num">{{ $project->buildings->count() }}</dd></div>
+        </dl>
+      </section>
+
+      {{-- Interna napomena projekta --}}
+      <section class="kartica p-space-lg flex flex-col gap-space-sm">
+        <div class="flex items-center justify-between">
+          <h2 class="font-headline-sm text-headline-sm flex items-center gap-1.5"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">edit_note</span>Interna napomena</h2>
+          <button type="button" data-modal-open="modal-izmena-projekta" class="dugme-tiho dugme-malo">{{ $project->napomena ? 'Izmeni' : 'Dodaj' }}</button>
+        </div>
+        @if($project->napomena)
+          <p class="bg-surface-container-low p-space-md rounded font-body-md text-body-md leading-relaxed whitespace-pre-line">{{ $project->napomena }}</p>
+          <span class="font-body-sm text-body-sm text-on-surface-variant">Ažurirano {{ $project->updated_at?->format('d.m.Y.') }}</span>
+        @else
+          <p class="font-body-md text-body-md text-on-surface-variant">Nema napomene. Ovde upišite trenutno stanje radova, dogovore sa izvođačem i slično — vidi je samo vaš tim.</p>
+        @endif
+      </section>
+    </div>
+
+    {{-- Sažetak ostalih delova dosijea sa prečicama --}}
+    <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-space-lg">
+      <section class="kartica p-space-lg flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <span class="w-9 h-9 rounded bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">folder_open</span></span>
+          <span class="font-headline-md text-headline-md font-mono-num">{{ $dokumenti->count() }}</span>
+        </div>
+        <div>
+          <h3 class="font-headline-sm text-headline-sm">Dokumentacija</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Važeće verzije dozvola, projekata, ugovora i zapisnika.</p>
+        </div>
+        <ul class="flex flex-col gap-1 font-body-md text-body-md">
+          @forelse($dokumenti->take(3) as $d)
+          <li class="flex items-center gap-1.5 truncate"><span class="material-symbols-outlined text-[16px] text-on-surface-variant">description</span><span class="truncate">{{ $d->naziv }}</span></li>
+          @empty
+          <li class="text-on-surface-variant">Još nema dokumenata.</li>
+          @endforelse
+        </ul>
+        <a href="{{ $url('dokumentacija') }}" class="dugme-sekundarno dugme-malo mt-auto">Otvori dokumentaciju<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+      </section>
+
+      <section class="kartica p-space-lg flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <span class="w-9 h-9 rounded bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">door_front</span></span>
+          <span class="font-headline-md text-headline-md font-mono-num">{{ $stanovi->count() }}</span>
+        </div>
+        <div>
+          <h3 class="font-headline-sm text-headline-sm">Stanovi</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Raspodela jedinica po statusu.</p>
+        </div>
+        <ul class="flex flex-col gap-1.5 font-body-md text-body-md">
+          @foreach([
+            ['Za prodaju', $stanovi->where('status', 'Za_prodaju')->count(), 'bg-secondary'],
+            ['Rezervisano', $stanovi->where('status', 'Rezervisan')->count(), 'bg-amber-500'],
+            ['Prodato', $stanovi->whereIn('status', ['Prodat_u_procesu_uknjizenja', 'Prodat_u_garanciji', 'Garancija_istekla'])->count(), 'bg-emerald-500'],
+          ] as [$l, $v, $b])
+          <li class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full {{ $b }}"></span>{{ $l }}</span><span class="font-semibold font-mono-num">{{ $v }}</span></li>
+          @endforeach
+        </ul>
+        <a href="{{ $url('stanovi') }}" class="dugme-sekundarno dugme-malo mt-auto">Otvori stanove<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+      </section>
+
+      <section class="kartica p-space-lg flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <span class="w-9 h-9 rounded bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">fact_check</span></span>
+          <span class="font-headline-md text-headline-md font-mono-num">{{ $checkliste->sum('reseno_stavki') }}/{{ $checkliste->sum('ukupno_stavki') }}</span>
+        </div>
+        <div>
+          <h3 class="font-headline-sm text-headline-sm">Checkliste</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Upotrebna dozvola, uknjižba i paket za banku.</p>
+        </div>
+        <div class="flex flex-col gap-space-sm">
+          @foreach($checkliste as $cl)
+          @php $p = $cl->ukupno_stavki ? round($cl->reseno_stavki / $cl->ukupno_stavki * 100) : 0; @endphp
+          <a href="{{ route('checklists.show', ['building' => $zgrada, 'tip' => $cl->tip_checkliste]) }}" class="flex flex-col gap-1 group">
+            <span class="flex justify-between font-body-sm text-body-sm"><span class="group-hover:underline underline-offset-2">{{ Prikaz::label($cl->tip_checkliste) }}</span><span class="font-mono-num text-on-surface-variant">{{ $cl->reseno_stavki }}/{{ $cl->ukupno_stavki }}</span></span>
+            <span class="h-1.5 rounded-full bg-surface-container overflow-hidden"><span class="block h-full rounded-full {{ $p === 100 ? 'bg-emerald-500' : 'bg-primary' }}" style="width: {{ $p }}%"></span></span>
+          </a>
+          @endforeach
+        </div>
+        <a href="{{ $url('checkliste') }}" class="dugme-sekundarno dugme-malo mt-auto">Otvori checkliste<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+      </section>
+
+      <section class="kartica p-space-lg flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <span class="w-9 h-9 rounded bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">build_circle</span></span>
+          <span class="font-headline-md text-headline-md font-mono-num {{ $otvorene->count() ? 'text-error' : '' }}">{{ $otvorene->count() }}</span>
+        </div>
+        <div>
+          <h3 class="font-headline-sm text-headline-sm">Otvorene reklamacije</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Prijavljene ili u radu, za stanove ove zgrade.</p>
+        </div>
+        <div class="flex flex-col gap-1">
+          @forelse($otvorene->take(2) as $r)
+          <a href="{{ route('claims.show', $r) }}" class="p-2 rounded bg-surface-container-low hover:bg-surface-container flex items-center justify-between gap-2">
+            <span class="min-w-0"><span class="block font-label-md text-label-md truncate">{{ $r->unit->oznaka ?? '' }} · {{ Prikaz::label($r->tip_problema) }}</span><span class="block font-body-sm text-body-sm text-on-surface-variant truncate">{{ $r->odgovorni->ime_prezime ?? 'Nedodeljeno' }}</span></span>
+            <x-status :v="$r->status" :tacka="false" />
+          </a>
+          @empty
+          <p class="font-body-md text-body-md text-on-surface-variant">Nema otvorenih reklamacija.</p>
+          @endforelse
+        </div>
+        <a href="{{ $url('reklamacije') }}" class="dugme-sekundarno dugme-malo mt-auto">Sve reklamacije zgrade<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+      </section>
+    </div>
+  </div>
+@endif
+
+@if($tab === 'dokumentacija')
+  <section class="kartica overflow-hidden">
+    <form method="GET" action="{{ route('projects.show', $project) }}" class="px-space-lg py-space-md flex flex-wrap items-center gap-space-sm">
+      <input type="hidden" name="tab" value="dokumentacija"/>
+      <input type="hidden" name="zgrada" value="{{ $zgrada->id }}"/>
+      <select name="tip" data-auto-submit class="polje w-auto min-w-[220px]" aria-label="Tip dokumenta">
+        <option value="">Svi tipovi dokumenata</option>
+        @foreach($tipoviDokumenata as $t)<option value="{{ $t->naziv }}" @selected(request('tip') === $t->naziv)>{{ Prikaz::label($t->naziv) }}</option>@endforeach
+      </select>
+      <label class="inline-flex items-center gap-1.5 font-body-md text-body-md text-on-surface-variant cursor-pointer select-none">
+        <input type="checkbox" name="arhiva" value="1" data-auto-submit @checked(request()->boolean('arhiva')) class="w-4 h-4 accent-black"> Prikaži i arhivirane verzije
+      </label>
+      <button type="button" data-modal-open="modal-dokument" class="dugme-primarno ml-auto"><span class="material-symbols-outlined text-[18px]">add</span>Dodaj dokument</button>
+    </form>
+    @if($dokumenti->isEmpty())
+      <x-prazno ikonica="folder_open" naslov="Nema dokumenata" :tekst="request('tip') ? 'Nema dokumenata izabranog tipa za ovu zgradu.' : 'Dodajte dozvole, projekte, ugovore i zapisnike za zgradu '.$zgrada->naziv.'.'" />
+    @else
+      @include('documents._tabela')
+    @endif
+  </section>
+@endif
+
+@if($tab === 'stanovi')
+  <section class="kartica overflow-hidden">
+    <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+      <h2 class="font-headline-sm text-headline-sm">Stanovi — {{ $zgrada->naziv }}</h2>
+      <div class="flex items-center gap-space-sm">
+        <a href="{{ route('units.index', ['zgrada' => $zgrada->id]) }}" class="dugme-tiho dugme-malo">Pretraga i filteri<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+        <button type="button" data-modal-open="modal-novi-stan" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Dodaj stan</button>
+      </div>
+    </div>
+    @if($stanovi->isEmpty())
+      <x-prazno ikonica="door_front" naslov="Nema evidentiranih stanova" tekst="Dodajte stanove i lokale ove zgrade — uz svaki vodite kupca, dokumente i reklamacije." />
+    @else
+      @include('units._tabela')
+    @endif
+  </section>
+@endif
+
+@if($tab === 'checkliste')
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-space-lg">
+    @foreach($checkliste as $cl)
+    @php
+      $p = $cl->ukupno_stavki ? round($cl->reseno_stavki / $cl->ukupno_stavki * 100) : 0;
+      $gotovo = $cl->ukupno_stavki > 0 && $cl->reseno_stavki === $cl->ukupno_stavki;
+    @endphp
+    <a href="{{ route('checklists.show', ['building' => $zgrada, 'tip' => $cl->tip_checkliste]) }}" class="kartica p-space-lg flex flex-col gap-space-md hover:shadow-md transition-shadow">
+      <div class="flex items-center justify-between">
+        <span class="material-symbols-outlined text-[22px] {{ $gotovo ? 'text-emerald-600' : 'text-on-surface-variant' }}">{{ $gotovo ? 'check_circle' : 'pending' }}</span>
+        <span class="cip {{ $gotovo ? 'bg-emerald-50 text-emerald-800' : 'bg-surface-container text-on-surface-variant' }}">{{ $gotovo ? 'Kompletno' : $p.'%' }}</span>
+      </div>
+      <div>
+        <h3 class="font-headline-sm text-headline-sm">{{ Prikaz::label($cl->tip_checkliste) }}</h3>
+        <p class="font-body-md text-body-md text-on-surface-variant">{{ $cl->reseno_stavki }} od {{ $cl->ukupno_stavki }} stavki rešeno</p>
+      </div>
+      <span class="h-2 rounded-full bg-surface-container overflow-hidden"><span class="block h-full rounded-full {{ $gotovo ? 'bg-emerald-500' : 'bg-primary' }}" style="width: {{ $p }}%"></span></span>
+      <span class="font-label-md text-label-md flex items-center gap-1">Otvori checklistu<span class="material-symbols-outlined text-[16px]">arrow_forward</span></span>
     </a>
     @endforeach
-  </div>
+  </section>
+@endif
 
-  <!-- TAB 1: PREGLED -->
-  @if($tab === 'pregled')
-  <div class="flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-b-xl shadow-sm">
-    <div class="bg-surface-container-low p-space-lg rounded-lg">
-      <div class="flex items-center justify-between mb-space-sm">
-        <span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-semibold">Tehnički i administrativni tok realizacije (Milestones)</span>
-        <span class="font-label-xs text-label-xs text-on-surface font-mono font-medium">Faza: {{ $milestonePozicija }}/6 ({{ \App\Support\Prikaz::label($project->status) }})</span>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-space-sm pt-space-xs">
-        @foreach($milestoneKoraci as $broj => $naziv)
-          @php $stanje = $broj < $milestonePozicija ? 'zavrseno' : ($broj === $milestonePozicija ? 'u_toku' : 'ceka'); @endphp
-        <div class="flex flex-col p-space-sm rounded-lg shadow-sm {{ $stanje === 'zavrseno' ? 'bg-surface-container-lowest' : ($stanje === 'u_toku' ? 'bg-surface-container-high' : 'bg-surface-container-low opacity-60') }}">
-          <div class="flex items-center justify-between mb-1">
-            <span class="font-label-xs text-label-xs font-mono font-semibold text-on-surface-variant">{{ str_pad($broj, 2, '0', STR_PAD_LEFT) }}</span>
-            <span class="font-label-xs text-label-xs px-1.5 py-0.5 rounded font-semibold {{ $stanje === 'zavrseno' ? 'bg-surface-container-high text-on-surface' : ($stanje === 'u_toku' ? 'bg-secondary text-on-secondary' : 'bg-surface-container-high text-on-surface-variant') }}">{{ $stanje === 'zavrseno' ? 'Završeno' : ($stanje === 'u_toku' ? 'U toku' : 'Čeka') }}</span>
-          </div>
-          <span class="font-body-sm text-body-sm font-semibold {{ $stanje === 'ceka' ? 'text-on-surface-variant' : 'text-on-surface' }}">{{ $naziv }}</span>
-        </div>
-        @endforeach
-      </div>
+@if($tab === 'reklamacije')
+  <section class="kartica overflow-hidden">
+    <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+      <h2 class="font-headline-sm text-headline-sm">Reklamacije — {{ $zgrada->naziv }}</h2>
+      @if($stanovi->isNotEmpty())
+      <button type="button" data-modal-open="modal-nova-reklamacija" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Nova reklamacija</button>
+      @endif
     </div>
+    @if($reklamacije->isEmpty())
+      <x-prazno ikonica="build_circle" naslov="Nema reklamacija" :tekst="$stanovi->isEmpty() ? 'Reklamacije se vezuju za stan — prvo dodajte stanove zgrade.' : 'Za stanove ove zgrade nije prijavljena nijedna reklamacija.'" />
+    @else
+      @include('claims._tabela')
+    @endif
+  </section>
+@endif
 
-    <div class="flex items-center justify-between">
-      <h2 class="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">Osnovni podaci projekta i zgrade</h2>
-      <button data-modal-open="modal-edit-project" class="h-8 px-space-md bg-surface-container text-on-surface hover:bg-surface-container-high font-body-sm text-body-sm font-medium rounded-lg shadow-sm flex items-center gap-space-xs transition-colors">
-        <span class="material-symbols-outlined text-[16px]">edit</span><span>Uredi</span>
-      </button>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
-      <div class="flex flex-col gap-space-xs bg-surface-container-low p-space-md rounded-lg">
-        @foreach([['Naziv projekta', $project->naziv],['Adresa objekta', trim(($project->lokacija_adresa ?: '').' '.($project->lokacija_grad ?: '')) ?: '—'],['Tip objekta', \App\Support\Prikaz::label($project->tip)]] as [$labela, $vrednost])
-        <div class="flex items-baseline justify-between py-1 bg-surface-container-lowest px-space-sm rounded gap-2">
-          <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $labela }}:</span>
-          <span class="font-body-sm text-body-sm text-on-surface font-semibold text-right">{{ $vrednost }}</span>
-        </div>
-        @endforeach
-      </div>
-      <div class="flex flex-col gap-space-xs bg-surface-container-low p-space-md rounded-lg">
-        @foreach([['Broj planiranih stanova', $project->broj_planiranih_stanova ?: '—'],['Datum početka radova', $project->datum_pocetka_gradnje?->format('d.m.Y.') ?: '—'],['Planirani završetak', $project->planirani_datum_zavrsetka?->format('d.m.Y.') ?: '—']] as [$labela, $vrednost])
-        <div class="flex items-baseline justify-between py-1 bg-surface-container-lowest px-space-sm rounded gap-2">
-          <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $labela }}:</span>
-          <span class="font-body-sm text-body-sm text-on-surface font-semibold font-mono text-right">{{ $vrednost }}</span>
-        </div>
-        @endforeach
-      </div>
-    </div>
+{{-- Prozori za unos (otvaraju se dugmadima iznad) --}}
+@include('documents._modal', ['zgrada' => $zgrada, 'stanovi' => $stanovi])
+@include('units._modal_novi')
+@if($stanovi->isNotEmpty())
+  @include('claims._modal_nova', ['stanovi' => $stanovi])
+@endif
 
-    <div class="mt-space-sm pt-space-md flex flex-wrap items-center gap-space-sm">
-      <span class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Brzi prelazak:</span>
-      <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'stanovi']) }}" class="px-space-md py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface font-body-sm flex items-center gap-1 transition-colors"><span class="material-symbols-outlined text-[16px]">apartment</span>Spisak i inventar stanova ({{ $zgrada->units->count() }})</a>
-      <a href="{{ route('checklists.show', $zgrada) }}" class="px-space-md py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface font-body-sm flex items-center gap-1 transition-colors"><span class="material-symbols-outlined text-[16px]">fact_check</span>Tehničke check-liste</a>
-      <a href="{{ route('claims.index', ['zgrada' => $zgrada->id]) }}" class="px-space-md py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface font-body-sm flex items-center gap-1 transition-colors"><span class="material-symbols-outlined text-[16px]">assignment_late</span>Garancije i otvorene reklamacije</a>
-    </div>
-  </div>
-  @endif
-
-  <!-- TAB 2: DOKUMENTACIJA -->
-  @if($tab === 'dokumentacija')
-  <div class="flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-b-xl shadow-sm">
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-low p-space-md rounded-lg">
-      <form method="GET" action="{{ route('projects.show', $project) }}" class="flex flex-wrap items-center gap-space-sm">
-        <input type="hidden" name="tab" value="dokumentacija"/>
-        <select name="tip" onchange="this.form.submit()" class="h-8 pl-space-sm pr-7 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg shadow-sm focus:outline-none cursor-pointer appearance-none">
-          <option value="">Svi tipovi</option>
-          @foreach($tipoviDokumenata as $tipDok)
-          <option value="{{ $tipDok->naziv }}" {{ request('tip') === $tipDok->naziv ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($tipDok->naziv) }}</option>
-          @endforeach
+<x-modal id="modal-nova-zgrada" naslov="Nova zgrada u projektu" ikonica="domain_add">
+  <form method="POST" action="{{ route('buildings.store', $project) }}" class="flex flex-col gap-space-md">
+    @csrf
+    <x-polje labela="Naziv zgrade *" za="nz-naziv"><input class="polje" id="nz-naziv" name="naziv" required placeholder="npr. Lamela B"/></x-polje>
+    <div class="grid grid-cols-2 gap-space-md">
+      <x-polje labela="Broj stanova" za="nz-broj"><input class="polje" id="nz-broj" name="broj_stanova" type="number" min="1"/></x-polje>
+      <x-polje labela="Status" za="nz-status">
+        <select class="polje" id="nz-status" name="status">
+          @foreach($statusiZgrade as $st)<option value="{{ $st }}">{{ Prikaz::label($st) }}</option>@endforeach
         </select>
-        <button type="submit" class="h-8 px-space-sm rounded-lg bg-surface-container-lowest text-on-surface-variant font-body-sm flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">filter_list</span>Filter</button>
-      </form>
-      <button data-modal-open="modal-add-doc" class="h-9 px-space-lg bg-primary text-on-primary hover:bg-primary-container font-body-md text-body-md font-semibold rounded-lg shadow-sm flex items-center justify-center gap-space-xs transition-colors whitespace-nowrap">
-        <span class="material-symbols-outlined text-[18px]">add</span><span>+ Dodaj dokument</span>
-      </button>
+      </x-polje>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left font-body-sm text-body-sm border-collapse">
-        <thead>
-          <tr class="bg-surface-container-high text-on-surface font-label-xs text-label-xs uppercase tracking-wider">
-            <th class="py-2.5 px-space-md">Naziv dokumenta</th>
-            <th class="py-2.5 px-space-md">Tip</th>
-            <th class="py-2.5 px-space-md">Datum izdavanja</th>
-            <th class="py-2.5 px-space-md">Izdavalac</th>
-            <th class="py-2.5 px-space-md">Vezano za</th>
-            <th class="py-2.5 px-space-md text-center">Verzija</th>
-            <th class="py-2.5 px-space-md text-right">Akcije</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-surface-container">
-          @forelse($dokumenti as $dok)
-          <tr class="hover:bg-surface-container-low transition-colors {{ $dok->aktivna_verzija ? '' : 'opacity-50' }}">
-            <td class="py-2.5 px-space-md font-medium text-on-surface flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">description</span>{{ $dok->naziv }}</td>
-            <td class="py-2.5 px-space-md text-on-surface-variant">{{ \App\Support\Prikaz::label($dok->tip) }}</td>
-            <td class="py-2.5 px-space-md font-mono text-on-surface">{{ $dok->datum_izdavanja?->format('d.m.Y.') ?: '—' }}</td>
-            <td class="py-2.5 px-space-md text-on-surface-variant">{{ $dok->izdavalac ?: '—' }}</td>
-            <td class="py-2.5 px-space-md">
-              @if($dok->stan_id)<span class="font-label-xs text-label-xs px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">Stan: {{ $dok->unit->oznaka ?? '—' }}</span>
-              @elseif($dok->zgrada_id)<span class="font-label-xs text-label-xs px-2 py-0.5 rounded bg-surface-container text-on-surface font-semibold">Zgrada</span>
-              @else<span class="font-label-xs text-label-xs px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-semibold">Projekat</span>@endif
-            </td>
-            <td class="py-2.5 px-space-md font-mono text-center text-on-surface">v{{ $dok->verzija }}{{ $dok->aktivna_verzija ? '' : ' (arh.)' }}</td>
-            <td class="py-2.5 px-space-md text-right whitespace-nowrap">
-              @if($dok->imaFajl())
-              <a href="{{ route('documents.download', $dok) }}" class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high inline-block" title="Preuzmi dokument"><span class="material-symbols-outlined text-[18px]">download</span></a>
-              @endif
-            </td>
-          </tr>
-          @empty
-          <tr><td colspan="7" class="py-6 px-space-md text-center text-on-surface-variant">Nema dokumenata. Kliknite "+ Dodaj dokument".</td></tr>
-          @endforelse
-        </tbody>
-      </table>
+    <p class="font-body-sm text-body-sm text-on-surface-variant">Checkliste (upotrebna dozvola, uknjižba, paket za banku) prave se automatski.</p>
+    <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-nova-zgrada" class="dugme-sekundarno">Otkaži</button><button class="dugme-primarno">Dodaj zgradu</button></div>
+  </form>
+</x-modal>
+
+<x-modal id="modal-izmena-zgrade" :naslov="'Zgrada '.$zgrada->naziv" ikonica="domain">
+  <form method="POST" action="{{ route('buildings.update', $zgrada) }}" class="flex flex-col gap-space-md">
+    @csrf @method('PATCH')
+    <x-polje labela="Naziv zgrade *" za="iz-naziv"><input class="polje" id="iz-naziv" name="naziv" value="{{ $zgrada->naziv }}" required/></x-polje>
+    <div class="grid grid-cols-2 gap-space-md">
+      <x-polje labela="Broj stanova" za="iz-broj"><input class="polje" id="iz-broj" name="broj_stanova" type="number" min="1" value="{{ $zgrada->broj_stanova }}"/></x-polje>
+      <x-polje labela="Status zgrade *" za="iz-status">
+        <select class="polje" id="iz-status" name="status" required>
+          @foreach($statusiZgrade as $st)<option value="{{ $st }}" @selected($zgrada->status === $st)>{{ Prikaz::label($st) }}</option>@endforeach
+        </select>
+      </x-polje>
     </div>
-  </div>
+    <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-izmena-zgrade" class="dugme-sekundarno">Otkaži</button><button class="dugme-primarno">Sačuvaj</button></div>
+  </form>
+</x-modal>
+@endif
+
+<x-modal id="modal-izmena-projekta" naslov="Podaci projekta" ikonica="edit" sirina="max-w-xl">
+  <form method="POST" action="{{ route('projects.update', $project) }}" class="flex flex-col gap-space-md">
+    @csrf @method('PATCH')
+    <x-polje labela="Naziv projekta *" za="ip-naziv"><input class="polje" id="ip-naziv" name="naziv" value="{{ $project->naziv }}" required/></x-polje>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+      <x-polje labela="Adresa" za="ip-adresa"><input class="polje" id="ip-adresa" name="lokacija_adresa" value="{{ $project->lokacija_adresa }}"/></x-polje>
+      <x-polje labela="Grad" za="ip-grad"><input class="polje" id="ip-grad" name="lokacija_grad" value="{{ $project->lokacija_grad }}"/></x-polje>
+      <x-polje labela="Tip objekta" za="ip-tip">
+        <select class="polje" id="ip-tip" name="tip">
+          @foreach(config('statusi.tip_projekta') as $tp)<option value="{{ $tp }}" @selected($project->tip === $tp)>{{ Prikaz::label($tp) }}</option>@endforeach
+        </select>
+      </x-polje>
+      <x-polje labela="Status *" za="ip-status">
+        <select class="polje" id="ip-status" name="status" required>
+          @foreach($statusiProjekta as $st)<option value="{{ $st }}" @selected($project->status === $st)>{{ Prikaz::label($st) }}</option>@endforeach
+        </select>
+      </x-polje>
+      <x-polje labela="Broj planiranih stanova" za="ip-broj"><input class="polje" id="ip-broj" name="broj_planiranih_stanova" type="number" min="1" value="{{ $project->broj_planiranih_stanova }}"/></x-polje>
+      <div class="hidden sm:block"></div>
+      <x-polje labela="Početak gradnje" za="ip-pocetak"><input class="polje" id="ip-pocetak" name="datum_pocetka_gradnje" type="date" value="{{ $project->datum_pocetka_gradnje?->format('Y-m-d') }}"/></x-polje>
+      <x-polje labela="Planirani završetak" za="ip-kraj"><input class="polje" id="ip-kraj" name="planirani_datum_zavrsetka" type="date" value="{{ $project->planirani_datum_zavrsetka?->format('Y-m-d') }}"/></x-polje>
+    </div>
+    <x-polje labela="Interna napomena" za="ip-napomena"><textarea class="polje" id="ip-napomena" name="napomena" rows="3" placeholder="Stanje radova, dogovori sa izvođačem…">{{ $project->napomena }}</textarea></x-polje>
+    <div class="flex items-center justify-between gap-space-sm pt-space-xs">
+      <span></span>
+      <div class="flex gap-space-sm"><button type="button" data-modal-close="modal-izmena-projekta" class="dugme-sekundarno">Otkaži</button><button class="dugme-primarno">Sačuvaj</button></div>
+    </div>
+  </form>
+  @if($currentUser->uloga === 'Vlasnik')
+  <form method="POST" action="{{ route('projects.destroy', $project) }}" class="mt-space-md pt-space-md border-t border-surface-container flex items-center justify-between gap-space-sm" data-potvrdi="Trajno obrisati projekat „{{ $project->naziv }}“ i sve njegove podatke? Ovo se ne može poništiti.">
+    @csrf @method('DELETE')
+    <span class="font-body-sm text-body-sm text-on-surface-variant">Brisanje je trajno i dostupno samo vlasniku.</span>
+    <button class="dugme-tiho dugme-malo text-error hover:text-error hover:bg-error-container/40"><span class="material-symbols-outlined text-[16px]">delete</span>Obriši projekat</button>
+  </form>
   @endif
-
-  <!-- TAB 3: STANOVI -->
-  @if($tab === 'stanovi')
-  <div class="flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-b-xl shadow-sm">
-    <div class="flex items-center justify-between pb-space-sm">
-      <div>
-        <h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Registar stanova i jedinica ({{ $zgrada->units->count() }})</h2>
-        <p class="font-body-sm text-body-sm text-on-surface-variant">Evidencija etažnih celina — klik na red otvara dosije jedinice</p>
-      </div>
-      <button data-modal-open="modal-add-unit" class="h-8 px-space-md bg-primary text-on-primary font-body-sm text-body-sm rounded-lg shadow-sm font-medium">+ Dodaj jedinicu</button>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left font-body-sm text-body-sm border-collapse">
-        <thead>
-          <tr class="bg-surface-container-high text-on-surface font-label-xs text-label-xs uppercase">
-            <th class="py-2 px-space-md">Oznaka</th>
-            <th class="py-2 px-space-md">Sprat</th>
-            <th class="py-2 px-space-md text-right">Kvadratura</th>
-            <th class="py-2 px-space-md">Kupac / Vlasnik</th>
-            <th class="py-2 px-space-md">Status jedinice</th>
-            <th class="py-2 px-space-md text-center">Reklamacije</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-surface-container">
-          @foreach($zgrada->units as $stan)
-          <tr class="hover:bg-surface-container-low cursor-pointer" onclick="window.location='{{ route('units.index', ['zgrada' => $zgrada->id]) }}?stan={{ $stan->id }}'">
-            <td class="py-2.5 px-space-md font-mono font-semibold">{{ $stan->oznaka }}</td>
-            <td class="py-2.5 px-space-md">{{ $stan->sprat ?: '—' }}</td>
-            <td class="py-2.5 px-space-md font-mono text-right">{{ $stan->kvadratura ? number_format($stan->kvadratura, 2, ',', '.').' m²' : '—' }}</td>
-            <td class="py-2.5 px-space-md font-medium">{{ $stan->customer?->ime_prezime ?? '—' }}</td>
-            <td class="py-2.5 px-space-md"><x-status :v="$stan->status" /></td>
-            <td class="py-2.5 px-space-md text-center">
-              @php $br = $stan->otvoreneReklamacije()->count(); @endphp
-              <span class="font-label-sm text-label-sm px-2 py-0.5 rounded {{ $br > 0 ? 'bg-error-container text-on-error-container font-bold' : 'bg-surface-container text-on-surface-variant' }}">{{ $br }}</span>
-            </td>
-          </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-  </div>
-  @endif
-
-  <!-- TAB 4: CHECKLISTE -->
-  @if($tab === 'checkliste')
-  <div class="flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-b-xl shadow-sm">
-    <h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Tehničke check-liste i primopredaja</h2>
-    <div class="flex flex-col gap-space-xs">
-      @foreach($zgrada->checklists as $cl)
-      <a href="{{ route('checklists.show', ['building' => $zgrada, 'tip' => $cl->tip_checkliste]) }}" class="flex items-center justify-between p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors">
-        <div class="flex items-center gap-space-md">
-          <span class="material-symbols-outlined {{ $cl->reseno === $cl->ukupno ? 'text-on-tertiary-container' : 'text-secondary' }} text-[22px]">{{ $cl->reseno === $cl->ukupno ? 'check_circle' : 'pending' }}</span>
-          <div>
-            <div class="font-body-sm text-body-sm font-semibold text-on-surface">{{ \App\Support\Prikaz::label($cl->tip_checkliste) }}</div>
-            <div class="font-label-xs text-label-xs text-on-surface-variant">{{ $cl->reseno }}/{{ $cl->ukupno }} stavki zatvoreno</div>
-          </div>
-        </div>
-        <span class="font-label-xs text-label-xs px-2 py-0.5 rounded font-semibold {{ $cl->reseno === $cl->ukupno ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface' }}">{{ $cl->reseno === $cl->ukupno ? '100% Verifikovano' : round($cl->reseno / max($cl->ukupno,1) * 100).'% U toku' }}</span>
-      </a>
-      @endforeach
-    </div>
-  </div>
-  @endif
-
-  <!-- TAB 5: REKLAMACIJE -->
-  @if($tab === 'reklamacije')
-  <div class="flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-b-xl shadow-sm">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Postprodaja, garancije i reklamacije</h2>
-        <p class="font-body-sm text-body-sm text-on-surface-variant">Evidencija primedbi kupaca u garantnom roku</p>
-      </div>
-      <a href="{{ route('claims.index', ['zgrada' => $zgrada->id]) }}" class="h-8 px-space-md bg-primary text-on-primary font-body-sm text-body-sm rounded-lg shadow-sm font-medium flex items-center">Otvori modul reklamacija</a>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left font-body-sm text-body-sm border-collapse">
-        <thead>
-          <tr class="bg-surface-container-high text-on-surface font-label-xs text-label-xs uppercase">
-            <th class="py-2 px-space-md">Stan</th>
-            <th class="py-2 px-space-md">Tip problema</th>
-            <th class="py-2 px-space-md">Datum prijave</th>
-            <th class="py-2 px-space-md">Odgovorni</th>
-            <th class="py-2 px-space-md">Rok</th>
-            <th class="py-2 px-space-md">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-surface-container">
-          @forelse($reklamacije as $rek)
-          <tr class="hover:bg-surface-container-low cursor-pointer" onclick="window.location='{{ route('claims.index', ['reklamacija' => $rek->id]) }}'">
-            <td class="py-2.5 px-space-md font-medium">{{ $rek->unit->oznaka ?? '—' }}</td>
-            <td class="py-2.5 px-space-md">{{ \App\Support\Prikaz::label($rek->tip_problema) }}</td>
-            <td class="py-2.5 px-space-md font-mono">{{ $rek->datum_prijave?->format('d.m.Y.') }}</td>
-            <td class="py-2.5 px-space-md">{{ $rek->odgovorni?->ime_prezime ?? 'Nedodeljeno' }}</td>
-            <td class="py-2.5 px-space-md font-mono {{ $rek->kasni_dana ? 'text-error font-bold' : '' }}">{{ $rek->rok_resavanja?->format('d.m.Y.') ?: '—' }}</td>
-            <td class="py-2.5 px-space-md"><x-status :v="$rek->status" /></td>
-          </tr>
-          @empty
-          <tr><td colspan="6" class="py-6 px-space-md text-center text-on-surface-variant">Nema reklamacija za ovu zgradu.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-  </div>
-  @endif
-
-  <!-- MODAL: izmena projekta -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-primary/50 backdrop-blur-sm hidden" id="modal-edit-project">
-    <div class="bg-surface-container-lowest rounded-xl shadow-xl w-full max-w-xl p-space-lg flex flex-col gap-space-md max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between">
-        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Izmena osnovnih podataka</h3>
-        <button class="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high" data-modal-close="modal-edit-project"><span class="material-symbols-outlined text-[20px]">close</span></button>
-      </div>
-      <form method="POST" action="{{ route('projects.update', $project) }}" class="flex flex-col gap-space-md">
-        @csrf @method('PATCH')
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Naziv projekta *</label><input name="naziv" value="{{ $project->naziv }}" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip objekta</label>
-            <select name="tip" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
-              @foreach(config('statusi.tip_projekta') as $tp)<option value="{{ $tp }}" {{ $project->tip === $tp ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($tp) }}</option>@endforeach
-            </select>
-          </div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Lokacija (Adresa)</label><input name="lokacija_adresa" value="{{ $project->lokacija_adresa }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Lokacija (Grad)</label><input name="lokacija_grad" value="{{ $project->lokacija_grad }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Broj planiranih stanova</label><input name="broj_planiranih_stanova" type="number" min="1" value="{{ $project->broj_planiranih_stanova }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Status</label>
-            <select name="status" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
-              @foreach($statusiProjekta as $st)<option value="{{ $st }}" {{ $project->status === $st ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($st) }}</option>@endforeach
-            </select>
-          </div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Datum početka gradnje</label><input name="datum_pocetka_gradnje" type="date" value="{{ $project->datum_pocetka_gradnje?->format('Y-m-d') }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Planirani završetak</label><input name="planirani_datum_zavrsetka" type="date" value="{{ $project->planirani_datum_zavrsetka?->format('Y-m-d') }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-        </div>
-        <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-edit-project" class="px-space-md py-2 bg-surface-container-high rounded-lg font-label-md">Otkaži</button><button class="px-space-lg py-2 bg-primary text-on-primary rounded-lg font-label-md shadow-sm">Sačuvaj</button></div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: + Dodaj dokument (PRD 10.2) -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-space-md hidden" id="modal-add-doc">
-    <div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-xl p-space-lg flex flex-col gap-space-md max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-secondary text-[20px]">post_add</span><h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Dodavanje novog dokumenta</h3></div>
-        <button class="p-1 text-on-surface-variant rounded-lg" data-modal-close="modal-add-doc"><span class="material-symbols-outlined text-[20px]">close</span></button>
-      </div>
-      <form method="POST" action="{{ route('documents.store') }}" enctype="multipart/form-data" class="flex flex-col gap-space-md">
-        @csrf
-        <input type="hidden" name="projekat_id" value="{{ $project->id }}"/>
-        <input type="hidden" name="zgrada_id" value="{{ $zgrada->id }}"/>
-        <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip dokumenta *</label>
-          <select name="tip" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
-            <option value="" disabled selected>Izaberite tip...</option>
-            @foreach($tipoviDokumenata as $tipDok)<option value="{{ $tipDok->naziv }}">{{ \App\Support\Prikaz::label($tipDok->naziv) }}</option>@endforeach
-          </select>
-        </div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Naziv dokumenta *</label><input name="naziv" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm" placeholder="npr. Rešenje o građevinskoj dozvoli"/></div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Datum izdavanja</label><input name="datum_izdavanja" type="date" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Vezano za stan (opciono)</label>
-            <select name="stan_id" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"><option value="">— Zgrada/Projekat —</option>
-              @foreach($zgrada->units as $stan)<option value="{{ $stan->id }}">{{ $stan->oznaka }}</option>@endforeach
-            </select>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Izdavalac</label><input name="izdavalac" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm" placeholder="npr. Sekretarijat za urbanizam"/></div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Fajl * (PDF, DWG, JPG, PNG, ZIP, DOCX, XLSX — max 50MB)</label>
-          <input name="fajl" type="file" required class="block w-full text-sm text-on-surface file:mr-3 file:h-9 file:px-space-md file:rounded-lg file:border-0 file:bg-surface-container-high file:text-on-surface"/>
-        </div>
-        <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-add-doc" class="h-9 px-space-md bg-surface-container rounded-lg font-body-sm">Otkaži</button><button class="h-9 px-space-lg bg-primary text-on-primary rounded-lg font-body-sm font-semibold shadow-sm">Sačuvaj dokument</button></div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: + Dodaj jedinicu -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 backdrop-blur-sm hidden" id="modal-add-unit">
-    <div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-xl p-space-lg flex flex-col gap-space-md max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[22px]">add_home</span><h3 class="font-headline-md text-headline-md text-on-surface">Nova stambena jedinica</h3></div>
-        <button class="p-1 rounded hover:bg-surface-container" data-modal-close="modal-add-unit"><span class="material-symbols-outlined text-[18px]">close</span></button>
-      </div>
-      <form method="POST" action="{{ route('units.store', $zgrada) }}" class="flex flex-col gap-space-md">
-        @csrf
-        <div class="grid grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Oznaka stana *</label><input name="oznaka" required placeholder="npr. Stan 09" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Sprat / Etaža</label><input name="sprat" placeholder="npr. II sprat" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        </div>
-        <div class="grid grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Kvadratura (m²)</label><input name="kvadratura" type="number" step="0.01" min="0" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Broj soba</label><input name="broj_soba" type="number" min="0" max="10" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        </div>
-        <div class="grid grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Interna cena (€)</label><input name="cena" type="number" step="0.01" min="0" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Status jedinice *</label>
-            <select name="status" required class="h-9 px-space-sm bg-surface-container-low rounded-lg">
-              @foreach($statusiStana as $st)<option value="{{ $st }}">{{ $st }}</option>@endforeach
-            </select>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Kupac / Ugovarač (opciono)</label><input name="kupac_ime" placeholder="Ime i prezime kupca" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        <div class="grid grid-cols-2 gap-space-md">
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Email kupca</label><input name="kupac_email" type="email" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-          <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Telefon kupca</label><input name="kupac_telefon" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
-        </div>
-        <div class="flex justify-end gap-space-sm"><button type="button" data-modal-close="modal-add-unit" class="px-space-md py-1.5 rounded-lg bg-surface-container font-body-sm">Otkaži</button><button class="px-space-md py-1.5 rounded-lg bg-primary text-on-primary font-body-sm font-semibold">Potvrdi unos jedinice</button></div>
-      </form>
-    </div>
-  </div>
-  @endif
-</div>
+</x-modal>
 @endsection

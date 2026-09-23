@@ -26,7 +26,7 @@ class BuildingController extends Controller
 
         AuditLog::zabelezi('kreirana_zgrada', $zgrada, ['naziv' => $zgrada->naziv]);
 
-        return redirect()->route('projects.show', $project)->with('uspesno', 'Zgrada "'.$zgrada->naziv.'" dodata, checkliste su formirane.');
+        return redirect()->route('projects.show', ['project' => $project, 'zgrada' => $zgrada->id])->with('uspesno', 'Zgrada "'.$zgrada->naziv.'" dodata, checkliste su formirane.');
     }
 
     public function update(Request $request, Building $building)

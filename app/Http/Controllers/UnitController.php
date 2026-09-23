@@ -14,26 +14,41 @@ class UnitController extends Controller
     // Samostalan ekran Stanovi/Jedinice (PRD 9.3)
     public function index(Request $request)
     {
-        $zgrade = Building::with('project')->where('arhiviran', false)->get();
-        $zgrada = $zgrade->firstWhere('id', (int) $request->get('zgrada'));
-        $zgrada = $zgrada ?: $zgrade->first();
+        $zgrade = Building::with('project')->where('arhiviran', false)->orderBy('naziv')->get();
+        $zgrada = $zgrade->firstWhere('id', (int) $request->get('zgrada')) ?: $zgrade->first();
 
         $stanovi = collect();
         $statistika = [];
         if ($zgrada) {
             // Broj otvorenih reklamacija u istom upitu (umesto posebnog upita za svaki red)
-            $zgrada->load(['units' => fn ($q) => $q->with('customer')->withCount([
+            $svi = $zgrada->units()->with('customer')->withCount([
                 'claims as otvorene_reklamacije_count' => fn ($q) => $q->whereNotIn('status', ['Resena', 'Odbijena']),
-            ])]);
-            $stanovi = $zgrada->units;
+            ])->where('arhiviran', false)->orderBy('oznaka')->get();
+
             $statistika = [
-                'ukupno' => $stanovi->count(),
-                'za_prodaju' => $stanovi->where('status', 'Za_prodaju')->count(),
-                'rezervisan' => $stanovi->where('status', 'Rezervisan')->count(),
-                'uknjizenje_garancija' => $stanovi->whereIn('status', ['Prodat_u_procesu_uknjizenja', 'Prodat_u_garanciji'])->count(),
-                'garancija_istekla' => $stanovi->where('status', 'Garancija_istekla')->count(),
-                'otvorene_reklamacije' => $stanovi->sum('otvorene_reklamacije_count'),
+                'ukupno' => $svi->count(),
+                'prodato' => $svi->whereIn('status', ['Prodat_u_procesu_uknjizenja', 'Prodat_u_garanciji', 'Garancija_istekla'])->count(),
+                'za_prodaju' => $svi->where('status', 'Za_prodaju')->count(),
+                'rezervisan' => $svi->where('status', 'Rezervisan')->count(),
+                'otvorene_reklamacije' => $svi->sum('otvorene_reklamacije_count'),
             ];
+
+            // Filteri: pretraga (oznaka / kupac) i grupa statusa (klik na karticu)
+            $stanovi = $svi;
+            if ($q = trim((string) $request->get('q'))) {
+                $stanovi = $stanovi->filter(fn ($s) => str_contains(mb_strtolower($s->oznaka.' '.($s->customer->ime_prezime ?? '')), mb_strtolower($q)));
+            }
+            $grupe = [
+                'prodato' => ['Prodat_u_procesu_uknjizenja', 'Prodat_u_garanciji', 'Garancija_istekla'],
+                'za_prodaju' => ['Za_prodaju'],
+                'rezervisan' => ['Rezervisan'],
+            ];
+            if (isset($grupe[$request->get('grupa')])) {
+                $stanovi = $stanovi->whereIn('status', $grupe[$request->get('grupa')]);
+            }
+            if ($request->get('grupa') === 'reklamacije') {
+                $stanovi = $stanovi->where('otvorene_reklamacije_count', '>', 0);
+            }
         }
 
         $statusiStana = config('statusi.status_stana');
@@ -79,28 +94,16 @@ class UnitController extends Controller
         return back()->with('uspesno', 'Jedinica "'.$stan->oznaka.'" je evidentirana.');
     }
 
+    // Dosije jedinice (PRD 9.3): osnovni podaci, dokumenti, reklamacije — na zasebnoj stranici
     public function show(Unit $unit)
     {
-        $unit->load('customer', 'documents', 'claims.odgovorni');
-        return response()->json([
-            'id' => $unit->id,
-            'oznaka' => $unit->oznaka,
-            'sprat' => $unit->sprat,
-            'kvadratura' => $unit->kvadratura,
-            'broj_soba' => $unit->broj_soba,
-            'cena' => $unit->cena,
-            'status' => $unit->status,
-            'kupac' => $unit->customer?->ime_prezime,
-            'kupac_email' => $unit->customer?->email,
-            'kupac_telefon' => $unit->customer?->telefon,
-            'dokumenti' => $unit->documents->map(fn ($d) => [
-                'id' => $d->id, 'naziv' => $d->naziv, 'tip' => $d->tip, 'ima_fajl' => $d->imaFajl(),
-            ]),
-            'reklamacije' => $unit->claims->map(fn ($c) => [
-                'id' => $c->id, 'tip' => $c->tip_problema, 'status' => $c->status,
-                'datum' => $c->datum_prijave?->format('d.m.Y.'),
-            ]),
-            'otvorene_reklamacije' => $unit->otvoreneReklamacije()->count(),
+        $unit->load('building.project', 'customer', 'documents', 'claims.odgovorni');
+
+        return view('units.show', [
+            'stan' => $unit,
+            'statusiStana' => config('statusi.status_stana'),
+            'tipoviDokumenata' => \App\Models\DocumentType::zaTenant()->orderBy('naziv')->get(),
+            'tipoviProblema' => config('statusi.tip_problema'),
         ]);
     }
 
@@ -113,10 +116,28 @@ class UnitController extends Controller
             'broj_soba' => ['nullable', 'integer', 'min:0', 'max:10'],
             'cena' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', FiksneListe::pravila('status_stana')],
+            'kupac_ime' => ['nullable', 'string', 'max:255'],
+            'kupac_email' => ['nullable', 'email', 'max:255'],
+            'kupac_telefon' => ['nullable', 'string', 'max:50'],
         ]);
 
         $stariStatus = $unit->status;
-        $unit->update($data);
+        $unit->fill(collect($data)->except(['kupac_ime', 'kupac_email', 'kupac_telefon'])->all());
+
+        // Kupac se menja samo ako je forma poslala polja kupca (dosije stana)
+        if ($request->has('kupac_ime')) {
+            if (!empty($data['kupac_ime'])) {
+                $kupac = Customer::firstOrCreate(
+                    ['tenant_id' => $unit->tenant_id, 'ime_prezime' => $data['kupac_ime']]
+                );
+                $kupac->update(['email' => $data['kupac_email'] ?? null, 'telefon' => $data['kupac_telefon'] ?? null]);
+                $unit->kupac_id = $kupac->id;
+            } else {
+                $unit->kupac_id = null;
+            }
+        }
+
+        $unit->save();
 
         if ($stariStatus !== $unit->status) {
             AuditLog::zabelezi('promena_statusa_stana', $unit, [
