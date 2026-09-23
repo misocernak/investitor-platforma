@@ -33,7 +33,11 @@ class TemeljApi
         $telo = json_encode($podaci, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $vreme = (string) time();
         try {
-            $odgovor = Http::timeout(25)->connectTimeout(5)
+            $zahtev = Http::timeout(25)->connectTimeout(5);
+            if (config('temelj.http_korisnik')) {
+                $zahtev = $zahtev->withBasicAuth(config('temelj.http_korisnik'), (string) config('temelj.http_lozinka'));
+            }
+            $odgovor = $zahtev
                 ->withHeaders([
                     'X-Temelj-Vreme' => $vreme,
                     'X-Temelj-Potpis' => self::potpis($vreme, $telo),
