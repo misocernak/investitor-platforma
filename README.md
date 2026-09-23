@@ -1,6 +1,6 @@
 # StructureOps — SaaS platforma za investitore stambene izgradnje (MVP)
 
-Implementacija PRD verzije 1.0: **Laravel 11 (PHP 8.2) + MySQL + Blade/Tailwind (CDN, bez build koraka)**.
+Implementacija PRD verzije 1.0: **Laravel 12 (PHP 8.2+) + MySQL + Blade/Tailwind (CDN, bez build koraka)**.
 
 ## Šta je urađeno po PRD-u
 
