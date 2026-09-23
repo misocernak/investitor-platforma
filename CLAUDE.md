@@ -31,3 +31,15 @@ Push na `main` automatski deploy-uje na server (.github/workflows/deploy.yml).
 
 Korisnik je početnik za server/GitHub deo — uputstva za ručne korake (cPanel, GitHub
 podešavanja) piši korak po korak, jednostavnim jezikom.
+
+## Izgled (CSS i ikonice)
+
+- CSS se pravi na GitHub-u pri deploy-u (`npm run build:css` → `public/css/app.css`), tokeni su u `tailwind.config.js`. Nema Tailwind CDN-a.
+- Ikonice (Material Symbols) se učitavaju samo sa spiska u `config/ikonice.php`. Nova ikonica u ekranu = dodati je i tamo (abecedno), inače se ne prikazuje.
+- Statusi se prikazuju kroz `App\Support\Prikaz` i `<x-status :v="..."/>`, nikad sirovo.
+
+## Posle deploy-a (korisnik pokreće u cPanel Terminalu)
+
+    cd ~/investitor.temelj.info && php artisan config:cache && php artisan route:cache && php artisan view:cache
+
+Obavezno kad se menjaju rute ili config — keširane rute inače ne vide novu rutu (500 greška).
