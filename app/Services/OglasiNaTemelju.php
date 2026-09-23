@@ -136,7 +136,7 @@ class OglasiNaTemelju
             'tenant_id' => $tenant->id,
             'oglas' => $podaci,
             'slike' => $podaci['status'] === 'skinut' ? [] : $oglas->slike()->get()
-                ->map(fn ($s) => ['url' => $s->url(), 'tip' => $s->tip, 'redosled' => $s->redosled])->values()->all(),
+                ->map(fn ($s) => ['url' => $s->url(), 'url_mala' => $s->urlMala(), 'tip' => $s->tip, 'redosled' => $s->redosled])->values()->all(),
         ]);
 
         if ($ok) {
@@ -166,6 +166,12 @@ class OglasiNaTemelju
             ->where(fn ($q) => $q->where('status', '!=', 'skinut')->orWhereNotNull('sinhronizovan_at'))
             ->limit($najvise)->get()
             ->each(fn (Oglas $o) => self::sinhronizuj($o));
+    }
+
+    /** Slanje posle odgovora korisniku — ekran se ne zadržava dok Temelj obrađuje oglas. */
+    public static function uPozadini(\Closure $posao): void
+    {
+        dispatch($posao)->afterResponse();
     }
 
     /** Posle izmene stana ili zgrade: prodat stan se skida sa Temelja, ostale izmene se šalju. */

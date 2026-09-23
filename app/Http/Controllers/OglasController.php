@@ -53,7 +53,12 @@ class OglasController extends Controller
         $tenant = auth()->user()->tenant;
         OglasiNaTemelju::proveriVezu($tenant);
 
-        return view('oglasi.forma', ['stan' => $unit, 'oglas' => $unit->oglas, 'tenant' => $tenant]);
+        // Oglasi drugih stanova u istoj zgradi — iz njih se mogu preuzeti fotografije jednim klikom
+        $susedi = Oglas::with(['unit', 'slike'])
+            ->whereHas('unit', fn ($q) => $q->where('zgrada_id', $unit->zgrada_id)->where('id', '!=', $unit->id))
+            ->has('slike')->get();
+
+        return view('oglasi.forma', ['stan' => $unit, 'oglas' => $unit->oglas, 'tenant' => $tenant, 'susedi' => $susedi]);
     }
 
     public function sacuvaj(Request $request, Unit $unit)
@@ -75,6 +80,7 @@ class OglasController extends Controller
             'tlocrt' => ['nullable', 'array'],
             'tlocrt.*' => ['integer'],
             'naslovna' => ['nullable', 'integer'],
+            'kopiraj_iz' => ['nullable', 'integer'],
             'zgrada.lat' => ['nullable', 'numeric', 'between:40,47'],
             'zgrada.lng' => ['nullable', 'numeric', 'between:17,24'],
             'zgrada.adresa' => ['nullable', 'string', 'max:255'],
@@ -100,13 +106,22 @@ class OglasController extends Controller
         $zaBrisanje = collect($data['obrisi'] ?? [])->map(fn ($id) => (int) $id);
         $noveSlike = $request->file('slike', []);
 
+        // Fotografije iz oglasa drugog stana u istoj zgradi (renderi zgrade, fasada…) — bez ponovnog slanja
+        $kopije = collect();
+        if (! empty($data['kopiraj_iz'])) {
+            $izvor = Oglas::with('slike')->whereKey($data['kopiraj_iz'])
+                ->whereHas('unit', fn ($q) => $q->where('zgrada_id', $unit->zgrada_id))->first();
+            $vec = $postojece->pluck('putanja');
+            $kopije = $izvor ? $izvor->slike->reject(fn ($s) => $vec->contains($s->putanja)) : collect();
+        }
+
         $ostaje = $postojece->reject(fn ($s) => $zaBrisanje->contains($s->id));
         $maks = config('temelj.maks_slika');
-        if ($ostaje->count() + count($noveSlike) > $maks) {
+        if ($ostaje->count() + $kopije->count() + count($noveSlike) > $maks) {
             return back()->withInput()->withErrors(['slike' => "Oglas može imati najviše {$maks} fotografija. Uklonite višak."]);
         }
         $tlocrt = collect($data['tlocrt'] ?? [])->map(fn ($id) => (int) $id);
-        if ($ostaje->reject(fn ($s) => $tlocrt->contains($s->id))->isEmpty() && count($noveSlike) === 0) {
+        if ($ostaje->reject(fn ($s) => $tlocrt->contains($s->id))->isEmpty() && count($noveSlike) === 0 && $kopije->where('tip', 'slika')->isEmpty()) {
             return back()->withInput()->withErrors(['slike' => 'Dodajte bar jednu fotografiju stana ili zgrade — oglasi bez fotografije se ne objavljuju.']);
         }
 
@@ -138,13 +153,15 @@ class OglasController extends Controller
         // 4) Fotografije: brisanje, tip (tlocrt), nove, redosled (naslovna prva)
         foreach ($postojece as $s) {
             if ($zaBrisanje->contains($s->id)) {
-                Storage::disk('oglasi')->delete($s->putanja);
-                $s->delete();
+                $s->obrisiSaFajlom();
             } else {
                 $s->update(['tip' => $tlocrt->contains($s->id) ? 'tlocrt' : 'slika']);
             }
         }
         $redosled = (int) $oglas->slike()->max('redosled');
+        foreach ($kopije as $k) {
+            $oglas->slike()->create(['putanja' => $k->putanja, 'tip' => $k->tip, 'redosled' => ++$redosled]);
+        }
         foreach ($noveSlike as $fajl) {
             $oglas->slike()->create([
                 'putanja' => $this->sacuvajSliku($fajl, $oglas),
@@ -156,14 +173,15 @@ class OglasController extends Controller
 
         AuditLog::zabelezi('sacuvan_oglas', $oglas, ['stan' => $unit->oznaka]);
 
-        // 5) Slanje na Temelj
+        // 5) Slanje na Temelj ide u pozadini — korisnik odmah dobija odgovor
         $tenant = auth()->user()->tenant;
         if (! $tenant->povezanSaTemeljem()) {
-            $poruka = 'Oglas je sačuvan. Pojaviće se na Temelju čim Temelj odobri povezivanje vaše firme (Oglasi → Povezivanje).';
-        } elseif (OglasiNaTemelju::sinhronizuj($oglas->fresh())) {
-            $poruka = 'Oglas je objavljen na Temelju. Upiti kupaca stižu u „Upiti kupaca“.';
+            $poruka = 'Oglas je sačuvan. Pojaviće se na Temelju čim Temelj odobri povezivanje vaše firme (Oglasi na Temelju).';
         } else {
-            $poruka = 'Oglas je sačuvan, ali Temelj trenutno nije odgovorio — poslaćemo ga ponovo automatski.';
+            $oglas->forceFill(['sinhronizovan_at' => null, 'greska_sinhronizacije' => null])->save();
+            $id = $oglas->id;
+            OglasiNaTemelju::uPozadini(fn () => OglasiNaTemelju::sinhronizuj(Oglas::withoutGlobalScopes()->find($id)));
+            $poruka = 'Oglas je sačuvan i šalje se na Temelj — za nekoliko sekundi vidljiv je kupcima.';
         }
 
         return redirect()->route('units.show', $unit)->with('uspesno', $poruka);
@@ -195,32 +213,43 @@ class OglasController extends Controller
         return back()->with('uspesno', $ok ? 'Izmene su poslate na Temelj.' : 'Temelj i dalje ne odgovara — pokušaćemo ponovo automatski.');
     }
 
-    /** Čuva fotografiju; ako je GD dostupan, smanjuje je na najviše 2000px (brže slanje i učitavanje). */
+    /**
+     * Čuva fotografiju u dve veličine: do 2000px (stranica stana) i 720px (liste, sličice).
+     * Bez GD-a čuva original. Vraća putanju velike verzije.
+     */
     private function sacuvajSliku(UploadedFile $fajl, Oglas $oglas): string
     {
-        $ime = $oglas->tenant_id.'/'.$oglas->id.'/'.Str::uuid().'.jpg';
+        $osnova = $oglas->tenant_id.'/'.$oglas->id.'/'.Str::uuid();
         // Vrlo velike fotografije (preko ~40 MP) ne obrađujemo — premalo memorije na hostingu
         $dim = @getimagesize($fajl->getRealPath());
         $izvor = $dim && $dim[0] * $dim[1] <= 40_000_000 && function_exists('imagecreatefromstring')
             ? @imagecreatefromstring((string) file_get_contents($fajl->getRealPath()))
             : null;
         if ($izvor && function_exists('imagejpeg')) {
-            [$w, $h] = [imagesx($izvor), imagesy($izvor)];
-            $nw = min($w, 2000);
-            $nh = (int) round($h * $nw / $w);
-            $slika = imagecreatetruecolor($nw, $nh);
-            imagefill($slika, 0, 0, imagecolorallocate($slika, 255, 255, 255));
-            imagecopyresampled($slika, $izvor, 0, 0, 0, 0, $nw, $nh, $w, $h);
-            ob_start();
-            imagejpeg($slika, null, 85);
-            Storage::disk('oglasi')->put($ime, ob_get_clean());
-            imagedestroy($slika);
+            foreach (['' => 2000, '-m' => 720] as $sufiks => $maks) {
+                Storage::disk('oglasi')->put($osnova.$sufiks.'.jpg', $this->smanji($izvor, $maks));
+            }
             imagedestroy($izvor);
-            return $ime;
+            return $osnova.'.jpg';
         }
-        $ime = preg_replace('/\.jpg$/', '.'.$fajl->extension(), $ime);
+        $ime = $osnova.'.'.$fajl->extension();
         Storage::disk('oglasi')->putFileAs(dirname($ime), $fajl, basename($ime));
         return $ime;
+    }
+
+    private function smanji($izvor, int $maks): string
+    {
+        [$w, $h] = [imagesx($izvor), imagesy($izvor)];
+        $nw = min($w, $maks);
+        $nh = (int) round($h * $nw / $w);
+        $slika = imagecreatetruecolor($nw, $nh);
+        imagefill($slika, 0, 0, imagecolorallocate($slika, 255, 255, 255));
+        imagecopyresampled($slika, $izvor, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        imageinterlace($slika, true);
+        ob_start();
+        imagejpeg($slika, null, $maks > 1000 ? 84 : 80);
+        imagedestroy($slika);
+        return ob_get_clean();
     }
 
     /** Naslovna fotografija ide prva, ostale zadržavaju svoj redosled. */

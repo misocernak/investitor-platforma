@@ -48,7 +48,7 @@
           <td>
             <div class="flex items-center gap-space-sm min-w-[220px]">
               @if($naslovna)
-                <img src="{{ $naslovna->url() }}" alt="" class="w-14 h-10 rounded object-cover bg-surface-container shrink-0" loading="lazy">
+                <img src="{{ $naslovna->urlMala() }}" alt="" class="w-14 h-10 rounded object-cover bg-surface-container shrink-0" loading="lazy">
               @else
                 <span class="w-14 h-10 rounded bg-surface-container flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">image</span></span>
               @endif

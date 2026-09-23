@@ -117,9 +117,8 @@ class ProjectController extends Controller
         }
 
         // Naziv, adresa, grad i rok završetka se vide u oglasima na Temelju
-        foreach ($project->buildings as $zgrada) {
-            \App\Services\OglasiNaTemelju::posleIzmeneZgrade($zgrada);
-        }
+        $zgrade = $project->buildings()->get();
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => $zgrade->each(fn ($z) => \App\Services\OglasiNaTemelju::posleIzmeneZgrade($z)));
 
         return back()->with('uspesno', 'Podaci projekta su sačuvani.');
     }

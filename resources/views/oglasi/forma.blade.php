@@ -61,7 +61,7 @@
       @foreach($slike as $s)
       <div class="rounded-lg overflow-hidden bg-surface-container-low flex flex-col" data-slika>
         <div class="relative aspect-[4/3] bg-surface-container">
-          <img src="{{ $s->url() }}" alt="" class="w-full h-full {{ $s->tip === 'tlocrt' ? 'object-contain bg-white' : 'object-cover' }}" loading="lazy">
+          <img src="{{ $s->urlMala() }}" alt="" class="w-full h-full {{ $s->tip === 'tlocrt' ? 'object-contain bg-white' : 'object-cover' }}" loading="lazy">
           @if($s->id === $naslovnaId)<span class="absolute top-1.5 left-1.5 cip bg-primary text-on-primary">Naslovna</span>@endif
         </div>
         <div class="p-2 flex flex-col gap-1 font-body-sm text-body-sm">
@@ -71,6 +71,18 @@
         </div>
       </div>
       @endforeach
+    </div>
+    @endif
+
+    @if($susedi->isNotEmpty())
+    <div class="flex flex-wrap items-end gap-space-sm p-space-md rounded-lg bg-secondary-fixed/40">
+      <x-polje labela="Brže: preuzmite fotografije iz oglasa drugog stana u ovoj zgradi" za="kopiraj-iz" class="flex-1 min-w-[260px]">
+        <select class="polje" id="kopiraj-iz" name="kopiraj_iz">
+          <option value="">— ne preuzimaj —</option>
+          @foreach($susedi as $sused)<option value="{{ $sused->id }}" @selected(old('kopiraj_iz') == $sused->id)>{{ $sused->unit->oznaka }} ({{ $sused->slike->count() }} fotografija)</option>@endforeach
+        </select>
+      </x-polje>
+      <span class="font-body-sm text-body-sm text-on-surface-variant pb-2">Renderi i fasada se ne šalju ponovo — dodaju se uz ove ispod.</span>
     </div>
     @endif
 

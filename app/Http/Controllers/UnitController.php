@@ -147,7 +147,7 @@ class UnitController extends Controller
 
         // Oglas na Temelju prati stan: prodat stan se sam skida, izmene cene/podataka se šalju
         $imaoOglas = $unit->oglas()->where('status', '!=', 'skinut')->exists();
-        \App\Services\OglasiNaTemelju::posleIzmeneStana($unit);
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\OglasiNaTemelju::posleIzmeneStana($unit->fresh()));
         $poruka = 'Podaci jedinice su sačuvani.';
         if ($imaoOglas && !in_array($unit->status, \App\Models\Oglas::STATUSI_U_PRODAJI, true)) {
             $poruka .= ' Stan više nije u prodaji, pa je oglas uklonjen sa Temelja.';

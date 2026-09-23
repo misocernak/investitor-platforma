@@ -47,7 +47,7 @@ class BuildingController extends Controller
         }
 
         // Status zgrade (u izgradnji / useljivo) se vidi u oglasima na Temelju
-        \App\Services\OglasiNaTemelju::posleIzmeneZgrade($building);
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\OglasiNaTemelju::posleIzmeneZgrade($building->fresh()));
 
         return back()->with('uspesno', 'Podaci zgrade su sačuvani.');
     }
