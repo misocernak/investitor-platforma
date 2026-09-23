@@ -110,7 +110,7 @@
             <span class="font-body-md text-body-md font-medium text-on-surface leading-tight">{{ $stavka->checklist->building->naziv }} — {{ str_replace('_', ' ', $stavka->checklist->tip_checkliste) }} — {{ $stavka->naziv_stavke }}</span>
             <span class="font-label-xs text-label-xs text-on-surface-variant mt-1">Projekat: {{ $stavka->checklist->building->project->naziv ?? '—' }}</span>
           </div>
-          <a href="{{ route('checklists.show', ['building' => $stavka->checklist->building_id, 'tip' => $stavka->checklist->tip_checkliste]) }}" class="self-end sm:self-center shrink-0 px-space-md py-1 bg-surface-container-lowest text-on-surface hover:bg-primary hover:text-on-primary rounded font-label-sm text-label-sm font-semibold shadow-sm transition-colors">Otvori</a>
+          <a href="{{ route('checklists.show', ['building' => $stavka->checklist->zgrada_id, 'tip' => $stavka->checklist->tip_checkliste]) }}" class="self-end sm:self-center shrink-0 px-space-md py-1 bg-surface-container-lowest text-on-surface hover:bg-primary hover:text-on-primary rounded font-label-sm text-label-sm font-semibold shadow-sm transition-colors">Otvori</a>
         </div>
         @empty
         <div class="p-space-md text-center text-on-surface-variant font-body-sm">Sve checklist stavke su rešene.</div>
