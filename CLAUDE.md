@@ -1,7 +1,7 @@
 ## O projektu
 
 StructureOps = **platforma B** (privatni SaaS za investitore, Laravel 12 / PHP 8.2+ / MySQL),
-poddomen `investitori.temelj.info`. Povezuje se sa **platformom A** (javni Temelj,
+poddomen `investitor.temelj.info`. Povezuje se sa **platformom A** (javni Temelj,
 lokalno u `C:\Users\User\Desktop\temelj`) preko API-ja — nikad direktnim pristupom
 bazama. Veza investitora A ↔ B ide preko matičnog broja (MB) uz verifikaciju.
 

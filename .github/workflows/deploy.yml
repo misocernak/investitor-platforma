@@ -1,4 +1,4 @@
-name: Deploy na investitori.temelj.info
+name: Deploy na investitor.temelj.info
 on:
   push:
     branches: [ main ]
@@ -27,9 +27,55 @@ jobs:
       - name: Oznaci prazne foldere
         run: find storage bootstrap/cache -type d -exec touch {}/.keep \;
 
-      - name: Uploaduj na server preko FTP-a
+      # Namecheap povremeno ne otvori FTP vezu na vreme kad se šalje mnogo fajlova
+      # (prvi deploy nosi i ceo vendor/). Zato: duži timeout + do 2 nova pokušaja.
+      # Pokušaj koji uspe upisuje stanje na server, pa sledeći deploy šalje samo izmene.
+      - name: Uploaduj na server preko FTP-a (pokušaj 1)
+        id: ftp1
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
+          timeout: 120000
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            .env
+
+      - name: Uploaduj na server preko FTP-a (pokušaj 2)
+        id: ftp2
+        if: steps.ftp1.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          timeout: 120000
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            .env
+
+      - name: Uploaduj na server preko FTP-a (pokušaj 3)
+        id: ftp3
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        continue-on-error: false
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          timeout: 120000
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
