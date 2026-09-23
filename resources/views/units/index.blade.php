@@ -60,9 +60,9 @@
               <td class="py-2.5 px-space-md text-on-surface-variant font-body-sm">{{ $stan->sprat ?: '—' }}</td>
               <td class="py-2.5 px-space-md text-right font-label-md tabular-nums">{{ $stan->kvadratura ? number_format($stan->kvadratura, 2, ',', '.').' m²' : '—' }}</td>
               <td class="py-2.5 px-space-md"><div class="flex items-center gap-space-xs">@if($stan->customer)<span class="material-symbols-outlined text-secondary text-[16px]">account_circle</span><span class="font-body-sm font-semibold">{{ $stan->customer->ime_prezime }}</span>@else<span class="font-label-sm text-on-surface-variant">—</span>@endif</div></td>
-              <td class="py-2.5 px-space-md"><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-label-xs text-label-xs font-medium bg-surface-container-high text-on-surface"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>{{ $stan->status }}</span></td>
+              <td class="py-2.5 px-space-md"><x-status :v="$stan->status" /></td>
               <td class="py-2.5 px-space-md text-center">
-                @php $br = $stan->otvoreneReklamacije()->count(); @endphp
+                @php $br = $stan->otvorene_reklamacije_count ?? 0; @endphp
                 <span class="font-label-sm text-label-sm px-2 py-0.5 rounded {{ $br > 0 ? 'bg-error-container text-on-error-container font-bold' : 'bg-surface-container text-on-surface-variant' }}">{{ $br }}</span>
               </td>
             </tr>
@@ -159,6 +159,9 @@
 @push('scripts')
 <script>
 // Dosije jedinice se puni sa servera (GET /stanovi/{id} - JSON)
+const PRIKAZ = @json(\App\Support\Prikaz::zaJs());
+const lbl = v => (PRIKAZ[v] ? PRIKAZ[v].label : String(v || '—').replaceAll('_', ' '));
+const boja = v => (PRIKAZ[v] ? PRIKAZ[v].klase[0] : 'bg-surface-container-high text-on-surface');
 function otvoriStan(id) {
   document.querySelectorAll('.unit-row').forEach(r => r.classList.remove('bg-surface-container-high', 'font-semibold'));
   const row = document.querySelector('.unit-row[data-id="' + id + '"]');
@@ -168,24 +171,24 @@ function otvoriStan(id) {
     .then(r => r.json())
     .then(u => {
       document.getElementById('panelUnitTitle').textContent = u.oznaka;
-      document.getElementById('panelStatusBadge').textContent = u.status;
+      document.getElementById('panelStatusBadge').textContent = lbl(u.status);
       document.getElementById('panelUnitSubtitle').textContent = '{{ $zgrada->naziv ?? '' }} • ' + (u.sprat || '—') + ' • ' + (u.kvadratura ? Number(u.kvadratura).toFixed(2) + ' m²' : '—');
       document.getElementById('panelMetaOznaka').textContent = u.oznaka + ' (' + (u.sprat || '—') + ')';
       document.getElementById('panelMetaKvadratura').textContent = (u.kvadratura ? Number(u.kvadratura).toFixed(2) + ' m²' : '—') + (u.broj_soba ? ' (' + u.broj_soba + ' soba)' : '');
       document.getElementById('panelMetaCena').textContent = u.cena ? Number(u.cena).toLocaleString('de-DE') + ' €' : '—';
-      document.getElementById('panelMetaStatus').textContent = u.status;
+      document.getElementById('panelMetaStatus').textContent = lbl(u.status);
       document.getElementById('panelCustomerName').textContent = u.kupac || 'Nema evidentiranog kupca';
       document.getElementById('panelCustomerEmail').textContent = u.kupac_email || '—';
       document.getElementById('panelCustomerPhone').textContent = u.kupac_telefon || '—';
 
       document.getElementById('panelDocCount').textContent = u.dokumenti.length + ' fajlova';
       document.getElementById('panelDocs').innerHTML = u.dokumenti.length
-        ? u.dokumenti.map(d => '<div class="flex items-center justify-between p-2 rounded bg-surface-container-lowest shadow-sm"><div class="flex items-center gap-2 overflow-hidden"><span class="material-symbols-outlined text-error text-[20px]">picture_as_pdf</span><div class="flex flex-col min-w-0"><span class="font-body-sm font-semibold truncate">' + d.naziv + '</span><span class="font-label-xs text-on-surface-variant">' + d.tip.replaceAll('_', ' ') + '</span></div></div>' + (d.ima_fajl ? '<a href="/dokumenti/' + d.id + '/preuzmi" class="p-1.5 rounded bg-surface-container hover:bg-surface text-on-surface"><span class="material-symbols-outlined text-[16px]">download</span></a>' : '') + '</div>').join('')
+        ? u.dokumenti.map(d => '<div class="flex items-center justify-between p-2 rounded bg-surface-container-lowest shadow-sm"><div class="flex items-center gap-2 overflow-hidden"><span class="material-symbols-outlined text-error text-[20px]">picture_as_pdf</span><div class="flex flex-col min-w-0"><span class="font-body-sm font-semibold truncate">' + d.naziv + '</span><span class="font-label-xs text-on-surface-variant">' + lbl(d.tip) + '</span></div></div>' + (d.ima_fajl ? '<a href="/dokumenti/' + d.id + '/preuzmi" class="p-1.5 rounded bg-surface-container hover:bg-surface text-on-surface"><span class="material-symbols-outlined text-[16px]">download</span></a>' : '') + '</div>').join('')
         : '<div class="p-space-md text-center bg-surface-container-lowest rounded text-on-surface-variant font-body-sm">Nema dokumenata za ovu jedinicu.</div>';
 
       document.getElementById('panelComplaintCount').textContent = u.otvorene_reklamacije + ' otvorenih';
       document.getElementById('panelComplaints').innerHTML = u.reklamacije.length
-        ? u.reklamacije.map(c => '<div class="p-space-sm rounded bg-surface-container-lowest shadow-sm flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm font-bold text-on-surface">#' + c.id + ' ' + c.tip.replaceAll('_', ' ') + '</span><span class="font-label-xs px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface font-semibold">' + c.status.replaceAll('_', ' ') + '</span></div><div class="font-label-xs text-on-surface-variant">Prijavljeno: ' + c.datum + '</div></div>').join('')
+        ? u.reklamacije.map(c => '<div class="p-space-sm rounded bg-surface-container-lowest shadow-sm flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm font-bold text-on-surface">#' + c.id + ' ' + lbl(c.tip) + '</span><span class="font-label-xs px-2 py-0.5 rounded-full font-semibold ' + boja(c.status) + '">' + lbl(c.status) + '</span></div><div class="font-label-xs text-on-surface-variant">Prijavljeno: ' + c.datum + '</div></div>').join('')
         : '<div class="p-space-md text-center bg-surface-container-lowest rounded text-on-surface-variant font-body-sm">Nema prijavljenih reklamacija.</div>';
     });
 }

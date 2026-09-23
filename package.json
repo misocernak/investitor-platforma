@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "description": "Samo za pravljenje CSS-a (Tailwind) pri deploy-u — sajt ne koristi Node na serveru.",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i resources/css/app.css -o public/css/app.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

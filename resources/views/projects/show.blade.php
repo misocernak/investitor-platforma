@@ -19,7 +19,7 @@
       </div>
       <h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">{{ $project->naziv }}</h1>
       <p class="font-body-sm text-body-sm text-on-surface-variant">
-        {{ $zgrada ? 'Zgrada: '.$zgrada->naziv.' · Kat. status: '.$zgrada->status : 'Zgrada još nije dodata — dodajte prvu zgradu da biste vodili dosije.' }}
+        {{ $zgrada ? 'Zgrada: '.$zgrada->naziv.' · Status zgrade: '.\App\Support\Prikaz::label($zgrada->status) : 'Zgrada još nije dodata — dodajte prvu zgradu da biste vodili dosije.' }}
       </p>
     </div>
     <div class="flex flex-col sm:flex-row sm:items-center gap-space-sm bg-surface-container-low p-space-sm rounded-lg">
@@ -28,7 +28,7 @@
         @csrf @method('PATCH')
         <select name="status" onchange="this.form.submit()" class="h-8 pl-space-sm pr-8 bg-surface-container-lowest text-on-surface font-label-md text-label-md rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer appearance-none">
           @foreach($statusiProjekta as $status)
-          <option value="{{ $status }}" {{ $project->status === $status ? 'selected' : '' }}>{{ $status }}</option>
+          <option value="{{ $status }}" {{ $project->status === $status ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($status) }}</option>
           @endforeach
         </select>
         <input type="hidden" name="naziv" value="{{ $project->naziv }}">
@@ -78,7 +78,7 @@
     <div class="bg-surface-container-low p-space-lg rounded-lg">
       <div class="flex items-center justify-between mb-space-sm">
         <span class="font-label-xs text-label-xs uppercase tracking-wider text-on-surface-variant font-semibold">Tehnički i administrativni tok realizacije (Milestones)</span>
-        <span class="font-label-xs text-label-xs text-on-surface font-mono font-medium">Faza: {{ $milestonePozicija }}/6 ({{ $project->status }})</span>
+        <span class="font-label-xs text-label-xs text-on-surface font-mono font-medium">Faza: {{ $milestonePozicija }}/6 ({{ \App\Support\Prikaz::label($project->status) }})</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-space-sm pt-space-xs">
         @foreach($milestoneKoraci as $broj => $naziv)
@@ -102,7 +102,7 @@
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
       <div class="flex flex-col gap-space-xs bg-surface-container-low p-space-md rounded-lg">
-        @foreach([['Naziv projekta', $project->naziv],['Adresa objekta', trim(($project->lokacija_adresa ?: '').' '.($project->lokacija_grad ?: '')) ?: '—'],['Tip objekta', $project->tip ?: '—']] as [$labela, $vrednost])
+        @foreach([['Naziv projekta', $project->naziv],['Adresa objekta', trim(($project->lokacija_adresa ?: '').' '.($project->lokacija_grad ?: '')) ?: '—'],['Tip objekta', \App\Support\Prikaz::label($project->tip)]] as [$labela, $vrednost])
         <div class="flex items-baseline justify-between py-1 bg-surface-container-lowest px-space-sm rounded gap-2">
           <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $labela }}:</span>
           <span class="font-body-sm text-body-sm text-on-surface font-semibold text-right">{{ $vrednost }}</span>
@@ -137,7 +137,7 @@
         <select name="tip" onchange="this.form.submit()" class="h-8 pl-space-sm pr-7 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg shadow-sm focus:outline-none cursor-pointer appearance-none">
           <option value="">Svi tipovi</option>
           @foreach($tipoviDokumenata as $tipDok)
-          <option value="{{ $tipDok->naziv }}" {{ request('tip') === $tipDok->naziv ? 'selected' : '' }}>{{ str_replace('_', ' ', $tipDok->naziv) }}</option>
+          <option value="{{ $tipDok->naziv }}" {{ request('tip') === $tipDok->naziv ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($tipDok->naziv) }}</option>
           @endforeach
         </select>
         <button type="submit" class="h-8 px-space-sm rounded-lg bg-surface-container-lowest text-on-surface-variant font-body-sm flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">filter_list</span>Filter</button>
@@ -163,7 +163,7 @@
           @forelse($dokumenti as $dok)
           <tr class="hover:bg-surface-container-low transition-colors {{ $dok->aktivna_verzija ? '' : 'opacity-50' }}">
             <td class="py-2.5 px-space-md font-medium text-on-surface flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px] text-on-surface-variant">description</span>{{ $dok->naziv }}</td>
-            <td class="py-2.5 px-space-md text-on-surface-variant">{{ str_replace('_', ' ', $dok->tip) }}</td>
+            <td class="py-2.5 px-space-md text-on-surface-variant">{{ \App\Support\Prikaz::label($dok->tip) }}</td>
             <td class="py-2.5 px-space-md font-mono text-on-surface">{{ $dok->datum_izdavanja?->format('d.m.Y.') ?: '—' }}</td>
             <td class="py-2.5 px-space-md text-on-surface-variant">{{ $dok->izdavalac ?: '—' }}</td>
             <td class="py-2.5 px-space-md">
@@ -216,7 +216,7 @@
             <td class="py-2.5 px-space-md">{{ $stan->sprat ?: '—' }}</td>
             <td class="py-2.5 px-space-md font-mono text-right">{{ $stan->kvadratura ? number_format($stan->kvadratura, 2, ',', '.').' m²' : '—' }}</td>
             <td class="py-2.5 px-space-md font-medium">{{ $stan->customer?->ime_prezime ?? '—' }}</td>
-            <td class="py-2.5 px-space-md"><span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-xs text-label-xs font-medium bg-surface-container-high text-on-surface"><span class="w-1.5 h-1.5 rounded-full bg-secondary mr-1"></span>{{ $stan->status }}</span></td>
+            <td class="py-2.5 px-space-md"><x-status :v="$stan->status" /></td>
             <td class="py-2.5 px-space-md text-center">
               @php $br = $stan->otvoreneReklamacije()->count(); @endphp
               <span class="font-label-sm text-label-sm px-2 py-0.5 rounded {{ $br > 0 ? 'bg-error-container text-on-error-container font-bold' : 'bg-surface-container text-on-surface-variant' }}">{{ $br }}</span>
@@ -239,7 +239,7 @@
         <div class="flex items-center gap-space-md">
           <span class="material-symbols-outlined {{ $cl->reseno === $cl->ukupno ? 'text-on-tertiary-container' : 'text-secondary' }} text-[22px]">{{ $cl->reseno === $cl->ukupno ? 'check_circle' : 'pending' }}</span>
           <div>
-            <div class="font-body-sm text-body-sm font-semibold text-on-surface">{{ str_replace('_', ' ', $cl->tip_checkliste) }}</div>
+            <div class="font-body-sm text-body-sm font-semibold text-on-surface">{{ \App\Support\Prikaz::label($cl->tip_checkliste) }}</div>
             <div class="font-label-xs text-label-xs text-on-surface-variant">{{ $cl->reseno }}/{{ $cl->ukupno }} stavki zatvoreno</div>
           </div>
         </div>
@@ -276,11 +276,11 @@
           @forelse($reklamacije as $rek)
           <tr class="hover:bg-surface-container-low cursor-pointer" onclick="window.location='{{ route('claims.index', ['reklamacija' => $rek->id]) }}'">
             <td class="py-2.5 px-space-md font-medium">{{ $rek->unit->oznaka ?? '—' }}</td>
-            <td class="py-2.5 px-space-md">{{ str_replace('_', ' ', $rek->tip_problema) }}</td>
+            <td class="py-2.5 px-space-md">{{ \App\Support\Prikaz::label($rek->tip_problema) }}</td>
             <td class="py-2.5 px-space-md font-mono">{{ $rek->datum_prijave?->format('d.m.Y.') }}</td>
             <td class="py-2.5 px-space-md">{{ $rek->odgovorni?->ime_prezime ?? 'Nedodeljeno' }}</td>
             <td class="py-2.5 px-space-md font-mono {{ $rek->kasni_dana ? 'text-error font-bold' : '' }}">{{ $rek->rok_resavanja?->format('d.m.Y.') ?: '—' }}</td>
-            <td class="py-2.5 px-space-md"><span class="font-label-xs text-label-xs px-2 py-0.5 rounded font-semibold {{ $rek->status === 'Resena' ? 'bg-emerald-100 text-emerald-900' : ($rek->status === 'Prijavljena' ? 'bg-secondary-fixed text-on-secondary-fixed' : 'bg-surface-container-high text-on-surface') }}">{{ str_replace('_', ' ', $rek->status) }}</span></td>
+            <td class="py-2.5 px-space-md"><x-status :v="$rek->status" /></td>
           </tr>
           @empty
           <tr><td colspan="6" class="py-6 px-space-md text-center text-on-surface-variant">Nema reklamacija za ovu zgradu.</td></tr>
@@ -304,7 +304,7 @@
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Naziv projekta *</label><input name="naziv" value="{{ $project->naziv }}" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip objekta</label>
             <select name="tip" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
-              @foreach(config('statusi.tip_projekta') as $tp)<option value="{{ $tp }}" {{ $project->tip === $tp ? 'selected' : '' }}>{{ str_replace('_', ' ', $tp) }}</option>@endforeach
+              @foreach(config('statusi.tip_projekta') as $tp)<option value="{{ $tp }}" {{ $project->tip === $tp ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($tp) }}</option>@endforeach
             </select>
           </div>
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Lokacija (Adresa)</label><input name="lokacija_adresa" value="{{ $project->lokacija_adresa }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
@@ -312,7 +312,7 @@
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Broj planiranih stanova</label><input name="broj_planiranih_stanova" type="number" min="1" value="{{ $project->broj_planiranih_stanova }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Status</label>
             <select name="status" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
-              @foreach($statusiProjekta as $st)<option value="{{ $st }}" {{ $project->status === $st ? 'selected' : '' }}>{{ $st }}</option>@endforeach
+              @foreach($statusiProjekta as $st)<option value="{{ $st }}" {{ $project->status === $st ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($st) }}</option>@endforeach
             </select>
           </div>
           <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Datum početka gradnje</label><input name="datum_pocetka_gradnje" type="date" value="{{ $project->datum_pocetka_gradnje?->format('Y-m-d') }}" class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm"/></div>
@@ -337,7 +337,7 @@
         <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip dokumenta *</label>
           <select name="tip" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm">
             <option value="" disabled selected>Izaberite tip...</option>
-            @foreach($tipoviDokumenata as $tipDok)<option value="{{ $tipDok->naziv }}">{{ str_replace('_', ' ', $tipDok->naziv) }}</option>@endforeach
+            @foreach($tipoviDokumenata as $tipDok)<option value="{{ $tipDok->naziv }}">{{ \App\Support\Prikaz::label($tipDok->naziv) }}</option>@endforeach
           </select>
         </div>
         <div class="flex flex-col gap-1"><label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Naziv dokumenta *</label><input name="naziv" required class="h-9 px-space-sm bg-surface-container-low rounded-lg shadow-sm" placeholder="npr. Rešenje o građevinskoj dozvoli"/></div>

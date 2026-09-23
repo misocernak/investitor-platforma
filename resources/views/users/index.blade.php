@@ -21,8 +21,8 @@
         <tr class="hover:bg-surface-container-low">
           <td class="py-3 px-space-md font-semibold text-on-surface">{{ $k->ime_prezime }}</td>
           <td class="py-3 px-space-md text-on-surface-variant">{{ $k->email }}</td>
-          <td class="py-3 px-space-md">{{ str_replace('_', '/', $k->uloga) }}</td>
-          <td class="py-3 px-space-md"><span class="font-label-xs px-2 py-0.5 rounded font-semibold {{ $k->status_naloga === 'Aktivan' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface' }}">{{ str_replace('_', ' ', $k->status_naloga) }}</span></td>
+          <td class="py-3 px-space-md">{{ \App\Support\Prikaz::label($k->uloga) }}</td>
+          <td class="py-3 px-space-md"><span class="font-label-xs px-2 py-0.5 rounded font-semibold {{ $k->status_naloga === 'Aktivan' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface' }}">{{ \App\Support\Prikaz::label($k->status_naloga) }}</span></td>
           <td class="py-3 px-space-md text-on-surface-variant">{{ $k->dodeljeneZgrade->pluck('naziv')->implode(', ') ?: '—' }}</td>
         </tr>
         @endforeach
@@ -47,7 +47,7 @@
         <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Lozinka *</label><input name="password" type="password" required minlength="8" class="h-9 px-space-sm bg-surface-container-low rounded-lg"/></div>
         <div class="flex flex-col gap-1"><label class="font-label-xs uppercase text-on-surface-variant font-semibold">Uloga *</label>
           <select name="uloga" required class="h-9 px-space-sm bg-surface-container-low rounded-lg">
-            @foreach($uloge as $u)<option value="{{ $u }}">{{ str_replace('_', '/', $u) }}</option>@endforeach
+            @foreach($uloge as $u)<option value="{{ $u }}">{{ \App\Support\Prikaz::label($u) }}</option>@endforeach
           </select>
         </div>
       </div>

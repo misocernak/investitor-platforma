@@ -22,6 +22,18 @@ jobs:
           mkdir -p bootstrap/cache
           composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
+      # CSS (Tailwind) se pravi ovde, jednom po deploy-u → public/css/app.css
+      - name: Pripremi Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Napravi CSS
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:css
+          ls -la public/css/app.css
+
       # FTP akcija preskače fajlove koji počinju sa ".git" (i .gitkeep), pa bi prazni
       # folderi koje Laravel mora da ima ostali nenapravljeni na serveru.
       - name: Oznaci prazne foldere

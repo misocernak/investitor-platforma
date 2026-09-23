@@ -43,7 +43,7 @@ class User extends Authenticatable
         return in_array($this->uloga, ['Vlasnik', 'Administrator']);
     }
 
-    public function mozeUređivati(): bool
+    public function mozeUredjivati(): bool
     {
         return in_array($this->uloga, ['Vlasnik', 'Administrator', 'Operater']);
     }

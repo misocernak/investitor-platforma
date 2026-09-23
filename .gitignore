@@ -19,3 +19,6 @@
 
 # graphify mapa projekta (lokalno)
 graphify-out/
+
+# CSS se pravi na GitHub-u pri deploy-u (npm run build:css)
+/public/css/app.css

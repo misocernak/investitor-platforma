@@ -21,7 +21,10 @@ class UnitController extends Controller
         $stanovi = collect();
         $statistika = [];
         if ($zgrada) {
-            $zgrada->load('units.customer');
+            // Broj otvorenih reklamacija u istom upitu (umesto posebnog upita za svaki red)
+            $zgrada->load(['units' => fn ($q) => $q->with('customer')->withCount([
+                'claims as otvorene_reklamacije_count' => fn ($q) => $q->whereNotIn('status', ['Resena', 'Odbijena']),
+            ])]);
             $stanovi = $zgrada->units;
             $statistika = [
                 'ukupno' => $stanovi->count(),
@@ -29,7 +32,7 @@ class UnitController extends Controller
                 'rezervisan' => $stanovi->where('status', 'Rezervisan')->count(),
                 'uknjizenje_garancija' => $stanovi->whereIn('status', ['Prodat_u_procesu_uknjizenja', 'Prodat_u_garanciji'])->count(),
                 'garancija_istekla' => $stanovi->where('status', 'Garancija_istekla')->count(),
-                'otvorene_reklamacije' => $zgrada->units->sum(fn ($u) => $u->otvoreneReklamacije()->count()),
+                'otvorene_reklamacije' => $stanovi->sum('otvorene_reklamacije_count'),
             ];
         }
 

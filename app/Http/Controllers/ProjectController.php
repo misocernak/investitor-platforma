@@ -14,7 +14,8 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        $projekti = Project::with('buildings')->where('arhiviran', false)->latest()->get();
+        $projekti = Project::with(['buildings' => fn ($q) => $q->withCount('units')])
+            ->where('arhiviran', false)->latest()->get();
         return view('projects.index', compact('projekti'));
     }
 

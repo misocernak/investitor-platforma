@@ -37,14 +37,14 @@
       <label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Status predmeta</label>
       <select name="status" class="h-9 pl-space-sm pr-8 bg-surface-container-low text-on-surface font-body-sm text-body-sm rounded appearance-none">
         <option value="">Svi statusi</option>
-        @foreach($statusi as $st)<option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ str_replace('_', ' ', $st) }}</option>@endforeach
+        @foreach($statusi as $st)<option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($st) }}</option>@endforeach
       </select>
     </div>
     <div class="flex flex-col gap-1 min-w-[180px]">
       <label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip problema</label>
       <select name="tip" class="h-9 pl-space-sm pr-8 bg-surface-container-low text-on-surface font-body-sm text-body-sm rounded appearance-none">
         <option value="">Svi tipovi</option>
-        @foreach($tipovi as $tp)<option value="{{ $tp }}" {{ request('tip') === $tp ? 'selected' : '' }}>{{ str_replace('_', ' ', $tp) }}</option>@endforeach
+        @foreach($tipovi as $tp)<option value="{{ $tp }}" {{ request('tip') === $tp ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($tp) }}</option>@endforeach
       </select>
     </div>
     <div class="flex flex-col gap-1 min-w-[200px] flex-1">
@@ -80,7 +80,7 @@
             @php $aktivna = $izabrana && $izabrana->id === $rek->id; @endphp
             <tr class="cursor-pointer transition-colors {{ $aktivna ? 'bg-surface-container-high font-medium' : 'hover:bg-surface-container-low' }}" onclick="window.location='{{ route('claims.index', array_merge(request()->only(['zgrada','status','tip','q']), ['reklamacija' => $rek->id])) }}'">
               <td class="py-2.5 px-space-md text-on-surface font-semibold">{{ $rek->unit->oznaka ?? '—' }}<div class="font-label-xs text-label-xs text-on-surface-variant font-normal">{{ $rek->unit->building->naziv ?? '' }}</div></td>
-              <td class="py-2.5 px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-label-xs text-label-xs font-medium">{{ str_replace('_', ' ', $rek->tip_problema) }}</span></td>
+              <td class="py-2.5 px-space-md"><span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-label-xs text-label-xs font-medium">{{ \App\Support\Prikaz::label($rek->tip_problema) }}</span></td>
               <td class="py-2.5 px-space-md font-label-sm font-mono text-on-surface-variant">{{ $rek->datum_prijave?->format('d.m.Y.') }}</td>
               <td class="py-2.5 px-space-md font-label-sm font-mono">
                 @if($rek->rok_resavanja)
@@ -89,8 +89,7 @@
                 @else<span class="text-on-surface-variant">—</span>@endif
               </td>
               <td class="py-2.5 px-space-md">
-                @php $boje = ['Prijavljena' => 'bg-secondary-fixed text-on-secondary-fixed', 'U_obradi' => 'bg-amber-100 text-amber-900', 'Dodeljena' => 'bg-surface-container text-on-surface', 'Resena' => 'bg-emerald-100 text-emerald-900', 'Odbijena' => 'bg-surface-container-high text-on-surface-variant']; @endphp
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {{ $boje[$rek->status] ?? 'bg-surface-container text-on-surface' }} font-label-xs text-label-xs font-semibold">{{ str_replace('_', ' ', $rek->status) }}</span>
+                <x-status :v="$rek->status" />
               </td>
             </tr>
             @empty
@@ -109,9 +108,9 @@
           <div class="flex items-center gap-space-xs">
             <span class="font-label-xs text-label-xs uppercase font-mono text-on-surface-variant">Dosije stavke #</span>
             <span class="font-label-xs text-label-xs font-mono font-bold text-on-surface">REC-{{ $izabrana->id }}</span>
-            <span class="ml-2 inline-flex items-center px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface font-label-xs text-label-xs font-semibold">{{ str_replace('_', ' ', $izabrana->status) }}</span>
+            <x-status :v="$izabrana->status" class="ml-2" />
           </div>
-          <h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $izabrana->unit->oznaka ?? '—' }} — {{ str_replace('_', ' ', $izabrana->tip_problema) }}</h2>
+          <h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $izabrana->unit->oznaka ?? '—' }} — {{ \App\Support\Prikaz::label($izabrana->tip_problema) }}</h2>
           <span class="font-body-sm text-body-sm text-on-surface-variant">{{ $izabrana->unit->building->naziv ?? '' }}{{ $izabrana->customer ? ' • Kupac: '.$izabrana->customer->ime_prezime : '' }}</span>
         </div>
       </div>
@@ -128,7 +127,7 @@
             <div class="flex flex-col gap-1">
               <label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-medium">Status reklamacije</label>
               <select name="status" class="h-9 pl-space-sm pr-7 bg-surface-container-lowest text-on-surface font-body-sm font-semibold rounded appearance-none shadow-sm">
-                @foreach($statusi as $st)<option value="{{ $st }}" {{ $izabrana->status === $st ? 'selected' : '' }}>{{ str_replace('_', ' ', $st) }}</option>@endforeach
+                @foreach($statusi as $st)<option value="{{ $st }}" {{ $izabrana->status === $st ? 'selected' : '' }}>{{ \App\Support\Prikaz::label($st) }}</option>@endforeach
               </select>
             </div>
             @if(!$currentUser->jeNadzor())
@@ -207,7 +206,7 @@
           <label class="font-label-xs text-label-xs uppercase text-on-surface-variant font-semibold">Tip problema *</label>
           <select name="tip_problema" required class="h-9 pl-space-sm pr-8 bg-surface-container-low text-on-surface font-body-sm rounded appearance-none" onchange="document.getElementById('drugoPolje').classList.toggle('hidden', this.value !== 'Drugo')">
             <option value="" disabled selected>Izaberite klasifikaciju...</option>
-            @foreach($tipovi as $tp)<option value="{{ $tp }}">{{ str_replace('_', ' ', $tp) }}</option>@endforeach
+            @foreach($tipovi as $tp)<option value="{{ $tp }}">{{ \App\Support\Prikaz::label($tp) }}</option>@endforeach
           </select>
         </div>
       </div>

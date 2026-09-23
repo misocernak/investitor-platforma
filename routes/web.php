@@ -42,6 +42,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/dokumenti/{document}/preuzmi', [DocumentController::class, 'download'])->name('documents.download');
         Route::delete('/dokumenti/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
+        Route::get('/checkliste', [ChecklistController::class, 'index'])->name('checklists.index');
         Route::get('/zgrade/{building}/checkliste', [ChecklistController::class, 'show'])->name('checklists.show');
         Route::patch('/checklist-stavke/{item}', [ChecklistController::class, 'toggleItem'])->name('checklists.toggle');
 
