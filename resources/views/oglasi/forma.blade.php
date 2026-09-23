@@ -22,7 +22,11 @@
 <x-zaglavlje :naslov="($novi ? 'Novi oglas' : 'Oglas').' · Stan '.$stan->oznaka"
   :putanja="['Oglasi na Temelju' => route('oglasi.index'), 'Stan '.$stan->oznaka => route('units.show', $stan), 'Oglas' => null]"
   :opis="$projekat->naziv.' · '.$zgrada->naziv.' — tri koraka: fotografije, cena, lokacija. Sve ostalo ide automatski.'">
-  @if($oglas)<x-slot:uzNaslov><x-oglas-stanje :oglas="$oglas" :tenant="$tenant" /></x-slot:uzNaslov>@endif
+  <x-slot:uzNaslov>
+    @if($oglas)
+      <x-oglas-stanje :oglas="$oglas" :tenant="$tenant" />
+    @endif
+  </x-slot:uzNaslov>
   @if($oglas?->temelj_url && $oglas->status === 'aktivan' && $oglas->sinhronizovan_at)
   <a href="{{ $oglas->temelj_url }}" target="_blank" rel="noopener" class="dugme-sekundarno"><span class="material-symbols-outlined text-[18px]">open_in_new</span>Pogledaj na Temelju</a>
   @endif
