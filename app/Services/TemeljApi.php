@@ -42,12 +42,13 @@ class TemeljApi
                 ->withBody($telo, 'application/json')
                 ->post(config('temelj.url').$putanja);
         } catch (\Throwable $e) {
-            Log::warning('Temelj API '.$putanja.' nedostupan: '.$e->getMessage());
+            Log::error('Temelj API '.$putanja.' nedostupan: '.$e->getMessage());
             return [false, null, 0];
         }
         $json = $odgovor->json();
-        if (! $odgovor->successful()) {
-            Log::warning('Temelj API '.$putanja.' → HTTP '.$odgovor->status());
+        if (! $odgovor->successful() || ! is_array($json)) {
+            // Zapisujemo i početak odgovora — tako se vidi da li je greška na Temelju ili zaštita hostinga
+            Log::error('Temelj API '.$putanja.' → HTTP '.$odgovor->status().': '.mb_substr(strip_tags($odgovor->body()), 0, 300));
         }
         return [$odgovor->successful() && ($json['ok'] ?? false), is_array($json) ? $json : null, $odgovor->status()];
     }
