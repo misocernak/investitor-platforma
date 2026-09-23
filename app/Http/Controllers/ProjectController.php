@@ -116,6 +116,11 @@ class ProjectController extends Controller
             ]);
         }
 
+        // Naziv, adresa, grad i rok završetka se vide u oglasima na Temelju
+        foreach ($project->buildings as $zgrada) {
+            \App\Services\OglasiNaTemelju::posleIzmeneZgrade($zgrada);
+        }
+
         return back()->with('uspesno', 'Podaci projekta su sačuvani.');
     }
 

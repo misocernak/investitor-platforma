@@ -20,7 +20,7 @@
         <td><a href="{{ route('units.show', $stan) }}" class="font-semibold hover:underline underline-offset-2">{{ $stan->oznaka }}</a></td>
         <td class="text-on-surface-variant">{{ $stan->sprat ?: '—' }}</td>
         <td class="text-right font-mono-num whitespace-nowrap">{{ $stan->kvadratura ? number_format($stan->kvadratura, 2, ',', '.').' m²' : '—' }}</td>
-        <td class="text-right font-mono-num">{{ $stan->broj_soba ?? '—' }}</td>
+        <td class="text-right font-mono-num">{{ $stan->broj_soba !== null ? rtrim(rtrim(number_format((float) $stan->broj_soba, 1, ',', ''), '0'), ',') : '—' }}</td>
         <td>
           @if($stan->customer){{ $stan->customer->ime_prezime }}@else<span class="text-on-surface-variant">—</span>@endif
         </td>

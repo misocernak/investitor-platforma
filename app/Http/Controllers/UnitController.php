@@ -61,7 +61,7 @@ class UnitController extends Controller
             'oznaka' => ['required', 'string', 'max:50'],
             'sprat' => ['nullable', 'string', 'max:50'],
             'kvadratura' => ['nullable', 'numeric', 'min:0'],
-            'broj_soba' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'broj_soba' => ['nullable', 'numeric', 'min:0', 'max:20'], // 2.5 = dvoiposoban
             'cena' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', FiksneListe::pravila('status_stana')],
             'kupac_ime' => ['nullable', 'string', 'max:255'],
@@ -97,7 +97,7 @@ class UnitController extends Controller
     // Dosije jedinice (PRD 9.3): osnovni podaci, dokumenti, reklamacije — na zasebnoj stranici
     public function show(Unit $unit)
     {
-        $unit->load('building.project', 'customer', 'documents', 'claims.odgovorni');
+        $unit->load('building.project', 'customer', 'documents', 'claims.odgovorni', 'oglas.slike', 'upiti');
 
         return view('units.show', [
             'stan' => $unit,
@@ -113,7 +113,7 @@ class UnitController extends Controller
             'oznaka' => ['required', 'string', 'max:50'],
             'sprat' => ['nullable', 'string', 'max:50'],
             'kvadratura' => ['nullable', 'numeric', 'min:0'],
-            'broj_soba' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'broj_soba' => ['nullable', 'numeric', 'min:0', 'max:20'], // 2.5 = dvoiposoban
             'cena' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', FiksneListe::pravila('status_stana')],
             'kupac_ime' => ['nullable', 'string', 'max:255'],
@@ -145,6 +145,14 @@ class UnitController extends Controller
             ]);
         }
 
-        return back()->with('uspesno', 'Podaci jedinice su sačuvani.');
+        // Oglas na Temelju prati stan: prodat stan se sam skida, izmene cene/podataka se šalju
+        $imaoOglas = $unit->oglas()->where('status', '!=', 'skinut')->exists();
+        \App\Services\OglasiNaTemelju::posleIzmeneStana($unit);
+        $poruka = 'Podaci jedinice su sačuvani.';
+        if ($imaoOglas && !in_array($unit->status, \App\Models\Oglas::STATUSI_U_PRODAJI, true)) {
+            $poruka .= ' Stan više nije u prodaji, pa je oglas uklonjen sa Temelja.';
+        }
+
+        return back()->with('uspesno', $poruka);
     }
 }

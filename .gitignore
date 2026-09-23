@@ -22,3 +22,7 @@ graphify-out/
 
 # CSS se pravi na GitHub-u pri deploy-u (npm run build:css)
 /public/css/app.css
+
+# Fotografije oglasa (nastaju na serveru)
+/public/oglasi-slike/*
+!/public/oglasi-slike/.htaccess

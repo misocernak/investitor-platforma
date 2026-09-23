@@ -17,6 +17,15 @@ return [
             'throw' => false,
             'report' => false,
         ],
+        // Fotografije oglasa — javne (Temelj.rs ih preuzima), direktno u public/ da ne treba storage:link
+        'oglasi' => [
+            'driver' => 'local',
+            'root' => public_path('oglasi-slike'),
+            'url' => rtrim(env('APP_URL', ''), '/').'/oglasi-slike',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

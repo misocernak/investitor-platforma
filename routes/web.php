@@ -6,7 +6,10 @@ use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\OglasController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TemeljVezaController;
+use App\Http\Controllers\UpitController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +49,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/checkliste', [ChecklistController::class, 'index'])->name('checklists.index');
         Route::get('/zgrade/{building}/checkliste', [ChecklistController::class, 'show'])->name('checklists.show');
         Route::patch('/checklist-stavke/{item}', [ChecklistController::class, 'toggleItem'])->name('checklists.toggle');
+
+        // Oglasi na Temelj.rs i upiti kupaca
+        Route::get('/oglasi', [OglasController::class, 'index'])->name('oglasi.index');
+        Route::get('/stanovi/{unit}/oglas', [OglasController::class, 'forma'])->name('oglasi.forma');
+        Route::post('/stanovi/{unit}/oglas', [OglasController::class, 'sacuvaj'])->name('oglasi.sacuvaj');
+        Route::post('/oglasi/{oglas}/status', [OglasController::class, 'status'])->name('oglasi.status');
+        Route::post('/oglasi/{oglas}/ponovi', [OglasController::class, 'ponovi'])->name('oglasi.ponovi');
+        Route::post('/temelj/veza', [TemeljVezaController::class, 'zatrazi'])->middleware('role:Vlasnik,Administrator')->name('temelj.veza');
+        Route::post('/temelj/veza/proveri', [TemeljVezaController::class, 'proveri'])->name('temelj.veza.proveri');
+        Route::get('/upiti', [UpitController::class, 'index'])->name('upiti.index');
+        Route::get('/upiti/{upit}', [UpitController::class, 'show'])->name('upiti.show');
+        Route::patch('/upiti/{upit}', [UpitController::class, 'update'])->name('upiti.update');
 
         // Korisnici - samo Vlasnik/Administrator (PRD 5)
         Route::get('/korisnici', [UserController::class, 'index'])->middleware('role:Vlasnik,Administrator')->name('users.index');

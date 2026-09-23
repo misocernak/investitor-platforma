@@ -6,7 +6,7 @@
       <x-polje labela="Oznaka *" za="ns-oznaka"><input class="polje" id="ns-oznaka" name="oznaka" required placeholder="npr. B-12"/></x-polje>
       <x-polje labela="Sprat" za="ns-sprat"><input class="polje" id="ns-sprat" name="sprat" placeholder="npr. 2"/></x-polje>
       <x-polje labela="Kvadratura (m²)" za="ns-kv"><input class="polje" id="ns-kv" name="kvadratura" type="number" step="0.01" min="0"/></x-polje>
-      <x-polje labela="Broj soba" za="ns-sobe"><input class="polje" id="ns-sobe" name="broj_soba" type="number" min="0" max="10"/></x-polje>
+      <x-polje labela="Broj soba" za="ns-sobe"><input class="polje" id="ns-sobe" name="broj_soba" type="number" min="0" max="20" step="0.5"/></x-polje>
       <x-polje labela="Cena (€, interno)" za="ns-cena"><input class="polje" id="ns-cena" name="cena" type="number" step="0.01" min="0"/></x-polje>
       <x-polje labela="Status *" za="ns-status">
         <select class="polje" id="ns-status" name="status" required>

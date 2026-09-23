@@ -45,3 +45,9 @@ podešavanja) piši korak po korak, jednostavnim jezikom.
     cd ~/investitor.temelj.info && php artisan config:cache && php artisan route:cache && php artisan view:cache
 
 Obavezno kad se menjaju rute ili config — keširane rute inače ne vide novu rutu (500 greška).
+
+## Oglasi na Temelju (veza sa Temelj.rs)
+- Server–server JSON POST potpisan HMAC-om (`App\Services\TemeljApi`); ključ `TEMELJ_API_KLJUC` samo u `.env`, isti kao `investitor_api.kljuc` u Temelj `app/config.php`.
+- Temelj → ovde: `POST /api/temelj/upit`, `POST /api/temelj/veza`. Ovde → Temelj: `/api/v1/veza`, `/api/v1/veza/status`, `/api/v1/oglasi`, `/api/v1/upiti/preuzmi`.
+- Logika u `App\Services\OglasiNaTemelju`; izmena stana/zgrade/projekta automatski šalje oglas, prodat stan skida oglas.
+- Fotografije oglasa su u `public/oglasi-slike/` (disk `oglasi`), Temelj ih preuzima po URL-u (APP_URL mora biti tačan domen).

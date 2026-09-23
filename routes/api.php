@@ -24,3 +24,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/reklamacije', [ClaimController::class, 'store']);
     Route::patch('/reklamacije/{claim}', [ClaimController::class, 'update']);
 });
+
+// Temelj.rs → Temelj Investitor (bez prijave; svaki zahtev je potpisan zajedničkim ključem)
+Route::middleware('throttle:120,1')->prefix('temelj')->group(function () {
+    Route::post('/upit', [\App\Http\Controllers\Api\TemeljController::class, 'upit']);
+    Route::post('/veza', [\App\Http\Controllers\Api\TemeljController::class, 'veza']);
+});

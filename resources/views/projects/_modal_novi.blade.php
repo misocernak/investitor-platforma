@@ -17,7 +17,7 @@
       <x-polje labela="Početak gradnje" za="np-pocetak"><input class="polje" id="np-pocetak" name="datum_pocetka_gradnje" type="date"/></x-polje>
       <x-polje labela="Planirani završetak" za="np-kraj"><input class="polje" id="np-kraj" name="planirani_datum_zavrsetka" type="date"/></x-polje>
     </div>
-    <p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">info</span>Projekat počinje u statusu „Planiranje". Status menjate ručno u dosijeu.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">info</span>Projekat počinje u statusu „Planiranje“. Status menjate ručno u dosijeu.</p>
     <div class="flex items-center justify-end gap-space-sm pt-space-xs">
       <button class="dugme-sekundarno" data-modal-close="modal-novi-projekat" type="button">Otkaži</button>
       <button class="dugme-primarno" type="submit">Sačuvaj i otvori dosije</button>

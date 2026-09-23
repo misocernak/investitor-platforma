@@ -11,6 +11,15 @@ class Tenant extends Model
         'kontakt_osoba', 'telefon', 'email', 'logo', 'napomena',
     ];
 
+    protected $casts = [
+        'temelj_veza_provereno_at' => 'datetime',
+    ];
+
+    public function povezanSaTemeljem(): bool
+    {
+        return $this->temelj_veza_status === 'odobrena';
+    }
+
     public function users()
     {
         return $this->hasMany(User::class, 'tenant_id');

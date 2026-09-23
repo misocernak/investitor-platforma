@@ -122,6 +122,30 @@ class Prikaz
         return ['Još '.$dana.' '.($dana === 1 ? 'dan' : 'dana'), $dana <= 3 ? 'text-amber-700' : 'text-on-surface-variant'];
     }
 
+    /**
+     * Stanje oglasa na Temelju jasnim rečima: [labela, ton, objašnjenje].
+     * Ton je jedan od ključeva KLASE (uspeh, info, upozorenje, greska, neutralno).
+     */
+    public static function oglasStanje($oglas, $tenant): array
+    {
+        if ($oglas->status === 'skinut') {
+            return ['Uklonjen sa Temelja', 'neutralno', 'Oglas se ne prikazuje. Stan je prodat ili je oglas ručno uklonjen.'];
+        }
+        if (!$tenant || $tenant->temelj_veza_status !== 'odobrena') {
+            return ['Čeka povezivanje firme', 'upozorenje', 'Oglas je spreman i pojaviće se na Temelju čim Temelj odobri povezivanje vaše firme.'];
+        }
+        if ($oglas->greska_sinhronizacije) {
+            return ['Izmene nisu stigle', 'greska', $oglas->greska_sinhronizacije];
+        }
+        if (!$oglas->sinhronizovan_at) {
+            return ['Šalje se na Temelj', 'info', 'Oglas će se pojaviti na Temelju za nekoliko trenutaka.'];
+        }
+        if ($oglas->status === 'pauziran') {
+            return ['Pauziran', 'neutralno', 'Oglas se trenutno ne prikazuje kupcima. Aktivirajte ga kad želite.'];
+        }
+        return ['Vidljiv na Temelju', 'uspeh', 'Kupci vide oglas i mogu da vam pošalju upit.'];
+    }
+
     /** Za JavaScript (panel stana): labele i tonovi svih poznatih vrednosti. */
     public static function zaJs(): array
     {

@@ -10,7 +10,7 @@ class Unit extends Model
     use BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id', 'zgrada_id', 'oznaka', 'sprat', 'kvadratura', 'broj_soba',
+        'tenant_id', 'zgrada_id', 'oznaka', 'sprat', 'kvadratura', 'terasa_m2', 'broj_soba',
         'cena', 'kupac_id', 'status', 'arhiviran',
     ];
 
@@ -34,6 +34,16 @@ class Unit extends Model
     public function documents()
     {
         return $this->hasMany(Document::class, 'stan_id');
+    }
+
+    public function oglas()
+    {
+        return $this->hasOne(Oglas::class, 'stan_id');
+    }
+
+    public function upiti()
+    {
+        return $this->hasMany(Upit::class, 'stan_id')->latest('primljeno_at');
     }
 
     public function otvoreneReklamacije()

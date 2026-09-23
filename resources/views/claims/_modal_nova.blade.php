@@ -28,7 +28,7 @@
       <x-polje labela="Datum prijave *" za="nr-datum"><input class="polje" id="nr-datum" name="datum_prijave" type="date" value="{{ now()->format('Y-m-d') }}" required/></x-polje>
       <x-polje labela="Fotografije / PDF (opciono)" za="nr-prilog"><input class="polje" id="nr-prilog" name="prilog[]" type="file" multiple accept="image/*,.pdf,.heic"/></x-polje>
     </div>
-    <p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">info</span>Upisuje se u statusu „Prijavljena". Odgovornog i rok dodeljujete u detalju reklamacije.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">info</span>Upisuje se u statusu „Prijavljena“. Odgovornog i rok dodeljujete u detalju reklamacije.</p>
     <div class="flex justify-end gap-space-sm pt-space-xs">
       <button type="button" data-modal-close="modal-nova-reklamacija" class="dugme-sekundarno">Otkaži</button>
       <button type="submit" class="dugme-primarno">Sačuvaj reklamaciju</button>

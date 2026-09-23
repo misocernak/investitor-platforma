@@ -11,9 +11,17 @@ class Building extends Model
 
     protected $fillable = [
         'tenant_id', 'projekat_id', 'naziv', 'broj_stanova', 'status', 'napomena', 'arhiviran',
+        // podaci za oglase na Temelju
+        'lat', 'lng', 'adresa', 'spratnost', 'grejanje', 'lift', 'energetski_razred', 'parking',
+        'dozvola_broj', 'dozvola_datum', 'dozvola_izdavalac', 'katastarska_parcela', 'prijava_radova_datum',
     ];
 
-    protected $casts = ['arhiviran' => 'boolean'];
+    protected $casts = [
+        'arhiviran' => 'boolean',
+        'lift' => 'boolean',
+        'dozvola_datum' => 'date',
+        'prijava_radova_datum' => 'date',
+    ];
 
     public function project()
     {

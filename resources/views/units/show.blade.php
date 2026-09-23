@@ -32,7 +32,7 @@
         <x-polje labela="Oznaka *" za="st-oznaka"><input class="polje" id="st-oznaka" name="oznaka" value="{{ $stan->oznaka }}" required/></x-polje>
         <x-polje labela="Sprat" za="st-sprat"><input class="polje" id="st-sprat" name="sprat" value="{{ $stan->sprat }}"/></x-polje>
         <x-polje labela="Kvadratura (m²)" za="st-kv"><input class="polje" id="st-kv" name="kvadratura" type="number" step="0.01" min="0" value="{{ $stan->kvadratura }}"/></x-polje>
-        <x-polje labela="Broj soba" za="st-sobe"><input class="polje" id="st-sobe" name="broj_soba" type="number" min="0" max="10" value="{{ $stan->broj_soba }}"/></x-polje>
+        <x-polje labela="Broj soba" za="st-sobe"><input class="polje" id="st-sobe" name="broj_soba" type="number" min="0" max="20" step="0.5" value="{{ $stan->broj_soba !== null ? (float) $stan->broj_soba : '' }}"/></x-polje>
         <x-polje labela="Cena (€, interno)" za="st-cena" :pomoc="$stan->cena && $stan->kvadratura > 0 ? number_format($stan->cena / $stan->kvadratura, 0, ',', '.').' €/m²' : null">
           <input class="polje" id="st-cena" name="cena" type="number" step="0.01" min="0" value="{{ $stan->cena }}"/>
         </x-polje>
@@ -66,6 +66,56 @@
   </section>
 
   <div class="lg:col-span-7 flex flex-col gap-space-lg">
+    {{-- Oglas na Temelju i upiti kupaca --}}
+    @php
+      $oglas = $stan->oglas;
+      $uProdaji = in_array($stan->status, \App\Models\Oglas::STATUSI_U_PRODAJI, true);
+      $noviUpitiStana = $stan->upiti->where('status', 'novo')->count();
+    @endphp
+    @if($oglas || $uProdaji)
+    <section class="kartica overflow-hidden">
+      <div class="px-space-lg py-space-md flex flex-wrap items-center justify-between gap-space-sm">
+        <div class="flex items-center gap-space-sm">
+          <span class="material-symbols-outlined text-[22px] text-on-surface-variant">campaign</span>
+          <h2 class="font-headline-sm text-headline-sm">Oglas na Temelju</h2>
+          @if($oglas)<x-oglas-stanje :oglas="$oglas" :tenant="$currentTenant" />@endif
+        </div>
+        <div class="flex items-center gap-space-sm">
+          @if($oglas?->temelj_url && $oglas->status === 'aktivan' && $oglas->sinhronizovan_at)
+          <a href="{{ $oglas->temelj_url }}" target="_blank" rel="noopener" class="dugme-tiho dugme-malo">Pogledaj<span class="material-symbols-outlined text-[16px]">open_in_new</span></a>
+          @endif
+          @if($uProdaji)
+          <a href="{{ route('oglasi.forma', $stan) }}" class="{{ $oglas ? 'dugme-sekundarno' : 'dugme-primarno' }} dugme-malo"><span class="material-symbols-outlined text-[16px]">{{ $oglas ? 'edit' : 'campaign' }}</span>{{ $oglas ? 'Izmeni oglas' : 'Oglasi na Temelju' }}</a>
+          @endif
+        </div>
+      </div>
+      @if(!$oglas)
+        <p class="px-space-lg pb-space-md font-body-md text-body-md text-on-surface-variant">Ovaj stan je u prodaji, a nije na Temelju. Dodajte fotografije i cenu — kupci ga vide uz ocene vaše firme i šalju upit direktno vama.</p>
+      @else
+        <p class="px-space-lg pb-space-md font-body-md text-body-md text-on-surface-variant">{{ \App\Support\Prikaz::oglasStanje($oglas, $currentTenant)[2] }}</p>
+      @endif
+      @if($stan->upiti->isNotEmpty())
+      <div class="border-t border-surface-container">
+        <div class="px-space-lg pt-space-md pb-space-xs flex items-center justify-between">
+          <span class="oznaka">Upiti kupaca ({{ $stan->upiti->count() }})</span>
+          @if($noviUpitiStana)<span class="cip bg-emerald-50 text-emerald-800">{{ $noviUpitiStana }} novo</span>@endif
+        </div>
+        <div class="px-space-sm pb-space-sm flex flex-col gap-1">
+          @foreach($stan->upiti->take(4) as $u)
+          <a href="{{ route('upiti.show', $u) }}" class="flex items-center justify-between gap-space-md px-space-md py-2 rounded {{ $u->status === 'novo' ? 'bg-emerald-50' : 'bg-surface-container-low' }} hover:bg-surface-container">
+            <span class="min-w-0">
+              <span class="block font-label-md text-label-md truncate">{{ $u->ime }}</span>
+              <span class="block font-body-sm text-body-sm text-on-surface-variant truncate">{{ \Illuminate\Support\Str::limit($u->poruka, 80) }}</span>
+            </span>
+            <span class="font-body-sm text-body-sm whitespace-nowrap {{ $u->status === 'novo' ? 'text-emerald-800 font-semibold' : 'text-on-surface-variant' }}">{{ $u->status === 'novo' ? 'Novo' : $u->primljeno_at->format('d.m.') }}</span>
+          </a>
+          @endforeach
+        </div>
+      </div>
+      @endif
+    </section>
+    @endif
+
     {{-- Reklamacije stana (sekcija 3) --}}
     <section class="kartica overflow-hidden">
       <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">

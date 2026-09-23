@@ -8,6 +8,26 @@
   </button>
 </x-zaglavlje>
 
+@if($noviUpiti->isNotEmpty())
+<section class="kartica overflow-hidden border-l-4 border-emerald-500" aria-label="Novi upiti kupaca">
+  <div class="px-space-lg h-14 flex items-center justify-between gap-space-sm">
+    <div class="flex items-center gap-space-sm">
+      <span class="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">forum</span></span>
+      <h2 class="font-headline-sm text-headline-sm">{{ $noviUpiti->count() === 1 ? 'Imate novi upit kupca' : 'Imate nove upite kupaca' }}</h2>
+    </div>
+    <a href="{{ route('upiti.index', ['status' => 'novo']) }}" class="dugme-tiho dugme-malo">Svi upiti<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+  </div>
+  <div class="px-space-sm pb-space-sm flex flex-col gap-1">
+    @foreach($noviUpiti as $u)
+    <a href="{{ route('upiti.show', $u) }}" class="flex items-center justify-between gap-space-md px-space-md py-2.5 rounded bg-emerald-50/60 hover:bg-emerald-50">
+      <span class="min-w-0"><strong class="font-label-md text-label-md">{{ $u->ime }}</strong> <span class="font-body-md text-body-md text-on-surface-variant">— stan {{ $u->unit->oznaka ?? '' }} · {{ \Illuminate\Support\Str::limit($u->poruka, 70) }}</span></span>
+      <span class="font-body-sm text-body-sm text-on-surface-variant whitespace-nowrap">{{ $u->primljeno_at->format('d.m. H:i') }}</span>
+    </a>
+    @endforeach
+  </div>
+</section>
+@endif
+
 {{-- 4 brojčane kartice (PRD 9.1) — klik vodi na odgovarajuću listu --}}
 <section class="grid grid-cols-2 lg:grid-cols-4 gap-gutter" aria-label="Ključni pokazatelji">
   <x-pokazatelj labela="Aktivni projekti" :vrednost="$karte['aktivni_projekti']" ikonica="apartment" opis="u portfelju" :href="route('projects.index')" />

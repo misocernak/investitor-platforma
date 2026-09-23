@@ -24,6 +24,8 @@
     ['checklists.index', 'Checkliste', 'fact_check', ['checklists.*']],
     ['claims.index', 'Reklamacije', 'build_circle', ['claims.*']],
     ['documents.index', 'Dokumentacija', 'folder_open', ['documents.*']],
+    ['oglasi.index', 'Oglasi na Temelju', 'campaign', ['oglasi.*']],
+    ['upiti.index', 'Upiti kupaca', 'forum', ['upiti.*']],
   ];
   if ($currentUser && $currentUser->jeNadzor()) {
     $nav = [['claims.index', 'Moje reklamacije', 'build_circle', ['claims.*']]];
@@ -35,6 +37,11 @@
   $otvoreneUMeniju = \App\Models\Claim::whereNotIn('status', ['Resena', 'Odbijena'])
     ->when($currentUser?->jeNadzor(), fn ($q) => $q->where('odgovorni_id', $currentUser->id))
     ->count();
+  // Novi upiti kupaca sa Temelja (tabela postoji tek posle migracije 2026_09_23)
+  $noviUpiti = 0;
+  if ($currentUser && !$currentUser->jeNadzor()) {
+    try { $noviUpiti = \App\Models\Upit::where('status', 'novo')->count(); } catch (\Throwable $e) { $noviUpiti = 0; }
+  }
   $inicijali = collect(explode(' ', $currentUser->ime_prezime ?? '?'))->filter()->take(2)->map(fn ($d) => mb_strtoupper(mb_substr($d, 0, 1)))->implode('');
   $firma = $currentTenant->naziv ?? 'Investitor';
 @endphp
@@ -71,6 +78,9 @@
       <span class="meni-tekst font-body-md text-body-md flex-1 truncate {{ $jeAktivna ? 'font-semibold' : '' }}">{{ $labela }}</span>
       @if($ruta === 'claims.index' && $otvoreneUMeniju > 0)
       <span class="meni-tekst min-w-[20px] h-5 px-1.5 rounded bg-error-container text-on-error-container text-[11px] font-semibold flex items-center justify-center">{{ $otvoreneUMeniju }}</span>
+      @endif
+      @if($ruta === 'upiti.index' && $noviUpiti > 0)
+      <span class="meni-tekst min-w-[20px] h-5 px-1.5 rounded bg-emerald-600 text-white text-[11px] font-semibold flex items-center justify-center" title="Novi upiti">{{ $noviUpiti }}</span>
       @endif
     </a>
     @endforeach
