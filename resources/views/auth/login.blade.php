@@ -46,7 +46,14 @@
         <button type="submit" class="dugme-primarno h-10 w-full">Prijavi se</button>
       </form>
     </div>
-    <p class="text-center font-body-sm text-body-sm text-on-surface-variant">Deo platforme Temelj.rs · Nalog otvara administrator vaše firme</p>
+    @if(session('uspesno'))
+    <div class="p-space-sm rounded bg-emerald-50 text-emerald-800 font-body-md text-body-md" role="status">{{ session('uspesno') }}</div>
+    @endif
+    <div class="kartica p-space-md flex flex-wrap items-center justify-between gap-space-sm">
+      <span class="font-body-md text-body-md"><strong>Investitor ste, a nemate nalog?</strong><br><span class="text-on-surface-variant">Registrujte firmu i objavite stanove na Temelju.</span></span>
+      <a href="{{ route('registracija') }}" class="dugme-sekundarno">Registrujte firmu</a>
+    </div>
+    <p class="text-center font-body-sm text-body-sm text-on-surface-variant">Deo platforme Temelj.rs · Članove tima dodaje administrator vaše firme</p>
   </div>
 </body>
 </html>

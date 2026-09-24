@@ -11,7 +11,9 @@ class UserController extends Controller
 {
     public function index()
     {
-        $korisnici = User::with('dodeljeneZgrade')->where('status_naloga', '!=', 'Deaktiviran')->get();
+        $korisnici = User::with('dodeljeneZgrade')
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->where('status_naloga', '!=', 'Deaktiviran')->get();
         $uloge = config('statusi.uloga');
         $zgrade = \App\Models\Building::where('arhiviran', false)->get();
         return view('users.index', compact('korisnici', 'uloge', 'zgrade'));
@@ -30,6 +32,8 @@ class UserController extends Controller
         ]);
 
         $korisnik = User::create([
+            'tenant_id' => auth()->user()->tenant_id,
+            'email_potvrdjen_at' => now(),
             'ime_prezime' => $data['ime_prezime'],
             'email' => $data['email'],
             'password' => $data['password'],
@@ -52,6 +56,9 @@ class UserController extends Controller
             'uloga' => ['required', FiksneListe::pravila('uloga')],
             'status_naloga' => ['required', FiksneListe::pravila('status_naloga')],
         ]);
+
+        // Samo korisnici sopstvene firme
+        abort_unless((int) $user->tenant_id === (int) auth()->user()->tenant_id, 404);
 
         // Admin ne sme menjati ulogu Vlasniku (PRD 5)
         if ($user->uloga === 'Vlasnik' && auth()->user()->uloga !== 'Vlasnik') {

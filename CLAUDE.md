@@ -51,3 +51,9 @@ Obavezno kad se menjaju rute ili config — keširane rute inače ne vide novu r
 - Temelj → ovde: `POST /api/temelj/upit`, `POST /api/temelj/veza`. Ovde → Temelj: `/api/v1/veza`, `/api/v1/veza/status`, `/api/v1/oglasi`, `/api/v1/upiti/preuzmi`.
 - Logika u `App\Services\OglasiNaTemelju`; izmena stana/zgrade/projekta automatski šalje oglas, prodat stan skida oglas.
 - Fotografije oglasa su u `public/oglasi-slike/` (disk `oglasi`), Temelj ih preuzima po URL-u (APP_URL mora biti tačan domen).
+
+## Registracija firmi i admin platforme
+- Firma se registruje sama (`/registracija`): MB → podaci iz APR-a preko Temelja (`/api/v1/firma`), lice, funkcija, punomoćje (obavezno samo za ovlašćeno lice). Status firme: `na_cekanju` → `aktivan` / `odbijen` / `suspendovan`.
+- Odobrava **admin platforme** (uloga `Platforma`, `tenant_id` = null, panel `/platforma`). Odobrenje je jedina provera: aktivira firmu i šalje `odobreno_na_platformi` Temelju (veza odmah odobrena, profil investitora se pravi ako ne postoji).
+- `TenantScope`: prijavljen korisnik bez firme ne vidi NIJEDAN podatak firmi (`1 = 0`). Middleware `firma` pušta u aplikaciju samo aktivne firme.
+- Nalog admina platforme: `php artisan platforma:admin email@adresa` (ispisuje privremenu lozinku).

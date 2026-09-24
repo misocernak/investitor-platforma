@@ -33,17 +33,22 @@
   if ($currentUser && $currentUser->mozeAdministrirati()) {
     $nav[] = ['users.index', 'Korisnici i uloge', 'group', ['users.*']];
   }
+  $jePlatforma = $currentUser?->jePlatforma();
+  if ($jePlatforma) {
+    $nav = [['platforma.index', 'Firme i zahtevi', 'domain', ['platforma.*']]];
+  }
   // Broj otvorenih reklamacija za oznaku u meniju (Nadzor vidi samo svoje dodele)
-  $otvoreneUMeniju = \App\Models\Claim::whereNotIn('status', ['Resena', 'Odbijena'])
+  $otvoreneUMeniju = $jePlatforma ? 0 : \App\Models\Claim::whereNotIn('status', ['Resena', 'Odbijena'])
     ->when($currentUser?->jeNadzor(), fn ($q) => $q->where('odgovorni_id', $currentUser->id))
     ->count();
+  $zahteviNaCekanju = $jePlatforma ? \App\Models\Tenant::where('status', 'na_cekanju')->count() : 0;
   // Novi upiti kupaca sa Temelja (tabela postoji tek posle migracije 2026_09_23)
   $noviUpiti = 0;
-  if ($currentUser && !$currentUser->jeNadzor()) {
+  if ($currentUser && !$currentUser->jeNadzor() && !$jePlatforma) {
     try { $noviUpiti = \App\Models\Upit::where('status', 'novo')->count(); } catch (\Throwable $e) { $noviUpiti = 0; }
   }
   $inicijali = collect(explode(' ', $currentUser->ime_prezime ?? '?'))->filter()->take(2)->map(fn ($d) => mb_strtoupper(mb_substr($d, 0, 1)))->implode('');
-  $firma = $currentTenant->naziv ?? 'Investitor';
+  $firma = $jePlatforma ? 'Admin platforme' : ($currentTenant->naziv ?? 'Investitor');
 @endphp
 
 {{-- Gornja traka — samo na telefonu (na računaru je sve u levom meniju, da sadržaj dobije punu visinu ekrana) --}}
@@ -79,6 +84,9 @@
       @if($ruta === 'claims.index' && $otvoreneUMeniju > 0)
       <span class="meni-tekst min-w-[20px] h-5 px-1.5 rounded bg-error-container text-on-error-container text-[11px] font-semibold flex items-center justify-center">{{ $otvoreneUMeniju }}</span>
       @endif
+      @if($ruta === 'platforma.index' && $zahteviNaCekanju > 0)
+      <span class="meni-tekst min-w-[20px] h-5 px-1.5 rounded bg-amber-500 text-white text-[11px] font-semibold flex items-center justify-center" title="Zahtevi na čekanju">{{ $zahteviNaCekanju }}</span>
+      @endif
       @if($ruta === 'upiti.index' && $noviUpiti > 0)
       <span class="meni-tekst min-w-[20px] h-5 px-1.5 rounded bg-emerald-600 text-white text-[11px] font-semibold flex items-center justify-center" title="Novi upiti">{{ $noviUpiti }}</span>
       @endif
@@ -93,10 +101,10 @@
     </button>
     <div class="meni-stavka flex items-center gap-space-sm p-1.5 rounded">
       <span class="meni-tekst w-8 h-8 rounded-full bg-surface-container-highest text-on-surface flex items-center justify-center shrink-0 text-[12px] font-semibold" title="{{ $currentUser->ime_prezime ?? '' }}">{{ $inicijali }}</span>
-      <span class="meni-tekst flex flex-col min-w-0 flex-1 leading-tight">
+      <a href="{{ route('nalog.lozinka') }}" class="meni-tekst flex flex-col min-w-0 flex-1 leading-tight hover:underline underline-offset-2" title="Moj nalog — promena lozinke">
         <span class="font-label-md text-label-md text-on-surface truncate">{{ $currentUser->ime_prezime ?? '' }}</span>
-        <span class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ \App\Support\Prikaz::label($currentUser->uloga ?? '') }}</span>
-      </span>
+        <span class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ $jePlatforma ? 'Admin platforme' : \App\Support\Prikaz::label($currentUser->uloga ?? '') }}</span>
+      </a>
       <form method="POST" action="{{ route('logout') }}">
         @csrf
         <button type="submit" class="w-8 h-8 flex items-center justify-center rounded text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors" title="Odjava" aria-label="Odjava">

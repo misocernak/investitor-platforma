@@ -7,6 +7,10 @@ return [
             'transport' => 'log',
             'channel' => env('MAIL_LOG_CHANNEL'),
         ],
+        'sendmail' => [
+            'transport' => 'sendmail',
+            'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),
+        ],
         'smtp' => [
             'transport' => 'smtp',
             'url' => env('MAIL_URL'),
@@ -20,7 +24,7 @@ return [
         ],
     ],
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'norekply@structureops.rs'),
-        'name' => env('MAIL_FROM_NAME', 'StructureOps'),
+        'address' => env('MAIL_FROM_ADDRESS', 'noreply@temelj.info'),
+        'name' => env('MAIL_FROM_NAME', 'Temelj Investitor'),
     ],
 ];

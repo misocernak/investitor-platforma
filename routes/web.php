@@ -6,6 +6,9 @@ use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\NalogController;
+use App\Http\Controllers\PlatformaController;
+use App\Http\Controllers\RegistracijaController;
 use App\Http\Controllers\OglasController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TemeljVezaController;
@@ -17,11 +20,37 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'prikaziFormu'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
+
+    // Samostalna registracija firme (odobrava admin platforme)
+    Route::get('/registracija', [RegistracijaController::class, 'forma'])->name('registracija');
+    Route::post('/registracija', [RegistracijaController::class, 'sacuvaj'])->middleware('throttle:6,1');
+    Route::get('/registracija/firma', [RegistracijaController::class, 'firma'])->middleware('throttle:30,1')->name('registracija.firma');
 });
+
+Route::get('/registracija/potvrda/{token}', [RegistracijaController::class, 'potvrda'])->name('registracija.potvrda');
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
+// Prijavljeni, bez obzira na stanje firme: ekran statusa zahteva i promena lozinke
 Route::middleware('auth')->group(function () {
+    Route::get('/registracija/status', [RegistracijaController::class, 'status'])->name('registracija.status');
+    Route::post('/registracija/potvrda-ponovo', [RegistracijaController::class, 'ponovoPotvrda'])->middleware('throttle:3,1')->name('registracija.ponovo');
+    Route::get('/nalog/lozinka', [NalogController::class, 'forma'])->name('nalog.lozinka');
+    Route::post('/nalog/lozinka', [NalogController::class, 'lozinka']);
+});
+
+// Admin platforme — samo nalozi firmi, bez pristupa njihovim podacima
+Route::middleware(['auth', 'role:Platforma'])->prefix('platforma')->name('platforma.')->group(function () {
+    Route::get('/', [PlatformaController::class, 'index'])->name('index');
+    Route::get('/firme/{firma}', [PlatformaController::class, 'show'])->name('show');
+    Route::post('/firme/{firma}/odobri', [PlatformaController::class, 'odobri'])->name('odobri');
+    Route::post('/firme/{firma}/odbij', [PlatformaController::class, 'odbij'])->name('odbij');
+    Route::post('/firme/{firma}/suspenzija', [PlatformaController::class, 'suspenzija'])->name('suspenzija');
+    Route::get('/firme/{firma}/ovlascenje', [PlatformaController::class, 'ovlascenje'])->name('ovlascenje');
+});
+
+// Aplikacija firme — samo za korisnike odobrene i aktivne firme
+Route::middleware(['auth', 'firma'])->group(function () {
 
     // Nadzor/izvodjac - samo svoje dodele (PRD 5)
     Route::middleware('role:Vlasnik,Administrator,Operater')->group(function () {

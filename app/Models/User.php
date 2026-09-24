@@ -11,15 +11,23 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'tenant_id', 'ime_prezime', 'email', 'password', 'uloga', 'status_naloga',
+        'tenant_id', 'ime_prezime', 'funkcija', 'email', 'telefon', 'password', 'uloga', 'status_naloga',
+        'email_token', 'email_potvrdjen_at',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    public const FUNKCIJE = [
+        'direktor' => 'Direktor',
+        'zakonski_zastupnik' => 'Zakonski zastupnik',
+        'ovlasceno_lice' => 'Ovlašćeno lice (uz punomoćje)',
+    ];
+
+    protected $hidden = ['password', 'remember_token', 'email_token'];
 
     protected function casts(): array
     {
         return [
             'password' => 'hashed',
+            'email_potvrdjen_at' => 'datetime',
         ];
     }
 
@@ -31,6 +39,12 @@ class User extends Authenticatable
     public function dodeljeneZgrade()
     {
         return $this->belongsToMany(Building::class, 'building_user', 'user_id', 'building_id');
+    }
+
+    /** Admin platforme: upravlja nalozima firmi, bez uvida u njihove podatke. */
+    public function jePlatforma(): bool
+    {
+        return $this->uloga === 'Platforma';
     }
 
     public function jeNadzor(): bool

@@ -12,8 +12,14 @@ class TenantScope implements Scope
     public function apply(Builder $builder, Model $model): void
     {
         $user = auth()->user();
-        if ($user && $user->tenant_id) {
+        if (! $user) {
+            return; // bez prijave (API sa Temelja, komande) — upiti tu uvek eksplicitno filtriraju firmu
+        }
+        if ($user->tenant_id) {
             $builder->where($model->getTable().'.tenant_id', $user->tenant_id);
+        } else {
+            // Prijavljen korisnik bez firme (admin platforme) ne sme da vidi podatke nijedne firme
+            $builder->whereRaw('1 = 0');
         }
     }
 }

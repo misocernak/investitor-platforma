@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
+            'firma' => \App\Http\Middleware\AktivnaFirma::class,
         ]);
         $middleware->web(append: [
             \App\Http\Middleware\DeliKorisnika::class,
