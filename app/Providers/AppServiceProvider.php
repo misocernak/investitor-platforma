@@ -23,9 +23,9 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        View::composer('*', function ($view) {
-            $view->with('currentUser', auth()->user());
-            $view->with('currentTenant', auth()->user()?->tenant);
-        });
+        // Prijavljeni korisnik i firma se dele sa svim prikazima jednom po zahtevu
+        // (ranije se ovo izvršavalo za svaki prikaz i svaku komponentu na stranici)
+        View::share('currentUser', null);
+        View::share('currentTenant', null);
     }
 }

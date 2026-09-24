@@ -65,7 +65,7 @@
       <tbody>
         @foreach($projekti as $projekat)
         @php
-          $otvorene = $projekat->otvorene_reklamacije;
+          $otvorene = $otvorenePoProjektu[$projekat->id] ?? 0;
           $jedinica = $projekat->buildings->sum('units_count');
         @endphp
         <tr data-href="{{ route('projects.show', $projekat) }}">

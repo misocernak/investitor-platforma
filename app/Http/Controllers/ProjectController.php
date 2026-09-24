@@ -16,7 +16,8 @@ class ProjectController extends Controller
     {
         $projekti = Project::with(['buildings' => fn ($q) => $q->where('arhiviran', false)->withCount('units')])
             ->where('arhiviran', false)->latest()->get();
-        return view('projects.index', compact('projekti'));
+        $otvorenePoProjektu = Project::otvoreneReklamacijePoProjektu();
+        return view('projects.index', compact('projekti', 'otvorenePoProjektu'));
     }
 
     public function store(Request $request)

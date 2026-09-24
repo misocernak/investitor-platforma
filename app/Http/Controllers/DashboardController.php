@@ -51,6 +51,8 @@ class DashboardController extends Controller
         // Novi upiti kupaca sa Temelja — najvažnija prodajna informacija, ide na vrh
         $noviUpiti = \App\Models\Upit::with('unit')->where('status', 'novo')->latest('primljeno_at')->limit(5)->get();
 
-        return view('dashboard', compact('karte', 'projekti', 'todo', 'hitneReklamacije', 'noviUpiti'));
+        $otvorenePoProjektu = Project::otvoreneReklamacijePoProjektu();
+
+        return view('dashboard', compact('karte', 'projekti', 'todo', 'hitneReklamacije', 'noviUpiti', 'otvorenePoProjektu'));
     }
 }

@@ -36,7 +36,7 @@
         @php
           $faza = $mapa[$projekat->status] ?? 1;
           $jedinica = $projekat->buildings->sum('units_count');
-          $otvorene = $projekat->otvorene_reklamacije;
+          $otvorene = $otvorenePoProjektu[$projekat->id] ?? 0;
         @endphp
         <tr data-href="{{ route('projects.show', $projekat) }}">
           <td>
