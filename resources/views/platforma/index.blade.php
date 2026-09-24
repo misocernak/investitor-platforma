@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-  $tonovi = ['na_cekanju' => 'bg-amber-50 text-amber-800', 'aktivan' => 'bg-emerald-50 text-emerald-800', 'odbijen' => 'bg-error-container text-on-error-container', 'suspendovan' => 'bg-surface-container-high text-on-surface-variant'];
+  $tonovi = ['na_cekanju' => 'bg-amber-50 text-amber-800', 'aktivan' => 'bg-emerald-50 text-emerald-800', 'odbijen' => 'bg-error-container text-on-error-container', 'suspendovan' => 'bg-surface-container-high text-on-surface-variant', 'raskinut' => 'bg-surface-container-high text-on-surface-variant'];
 @endphp
 <x-zaglavlje naslov="Firme i zahtevi" opis="Zahtevi za nalog i nalozi firmi na Temelj Investitoru. Ovde se vide samo podaci firme i kontakt lica — ne i projekti, stanovi ni upiti firmi." />
 

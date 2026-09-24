@@ -6,7 +6,7 @@
 @section('content')
 @php
   $v = $firma->vlasnik;
-  $tonovi = ['na_cekanju' => 'bg-amber-50 text-amber-800', 'aktivan' => 'bg-emerald-50 text-emerald-800', 'odbijen' => 'bg-error-container text-on-error-container', 'suspendovan' => 'bg-surface-container-high text-on-surface-variant'];
+  $tonovi = ['na_cekanju' => 'bg-amber-50 text-amber-800', 'aktivan' => 'bg-emerald-50 text-emerald-800', 'odbijen' => 'bg-error-container text-on-error-container', 'suspendovan' => 'bg-surface-container-high text-on-surface-variant', 'raskinut' => 'bg-surface-container-high text-on-surface-variant'];
   $zastupnik = $v && in_array($v->funkcija, ['direktor', 'zakonski_zastupnik'], true);
 @endphp
 
@@ -93,6 +93,27 @@
         @csrf
         <button class="dugme-sekundarno w-full"><span class="material-symbols-outlined text-[18px]">{{ $firma->status === 'aktivan' ? 'pause' : 'play_arrow' }}</span>{{ $firma->status === 'aktivan' ? 'Suspenduj nalog' : 'Ponovo aktiviraj nalog' }}</button>
       </form>
+    </section>
+
+    <section class="kartica p-space-lg flex flex-col gap-space-sm border-l-4 border-error">
+      <h2 class="font-headline-sm text-headline-sm">Raskid vlasništva nad profilom</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant">Kad nalog nije otvorio pravi vlasnik firme: veza sa Temeljem i svi oglasi se uklanjaju, nalog se zatvara, a matični broj postaje slobodan za registraciju pravog vlasnika. Ne može da se poništi.</p>
+      <form method="POST" action="{{ route('platforma.raskini', $firma) }}" class="flex flex-col gap-space-sm" data-potvrdi="Raskinuti vlasništvo firme {{ $firma->naziv }}? Oglasi nestaju sa Temelja i nalog se zatvara — ovo ne može da se poništi.">
+        @csrf
+        <x-polje labela="Razlog (dobija ga vlasnik naloga)" za="pl-raskid">
+          <input class="polje" id="pl-raskid" name="razlog" required maxlength="255" value="{{ old('razlog') }}" placeholder="npr. Nalog nije otvorio vlasnik firme"/>
+        </x-polje>
+        <label class="flex items-start gap-space-sm font-body-md text-body-md cursor-pointer">
+          <input type="checkbox" name="obrisi_opis" value="1" checked class="w-4 h-4 mt-0.5 accent-black">
+          <span>Obriši i opis firme i veb-sajt koje je ovaj nalog uneo na Temelju</span>
+        </label>
+        <button class="dugme-sekundarno w-full text-error"><span class="material-symbols-outlined text-[18px]">link_off</span>Raskini vlasništvo</button>
+      </form>
+    </section>
+    @elseif($firma->status === 'raskinut')
+    <section class="kartica p-space-lg flex flex-col gap-space-sm">
+      <h2 class="font-headline-sm text-headline-sm">Vlasništvo raskinuto</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant">Nalog je zatvoren i nije povezan sa Temeljem.@if($firma->razlog_odbijanja) Razlog: {{ $firma->razlog_odbijanja }}@endif</p>
     </section>
     @endif
   </div>

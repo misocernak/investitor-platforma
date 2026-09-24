@@ -46,6 +46,7 @@ Route::middleware(['auth', 'role:Platforma'])->prefix('platforma')->name('platfo
     Route::post('/firme/{firma}/odobri', [PlatformaController::class, 'odobri'])->name('odobri');
     Route::post('/firme/{firma}/odbij', [PlatformaController::class, 'odbij'])->name('odbij');
     Route::post('/firme/{firma}/suspenzija', [PlatformaController::class, 'suspenzija'])->name('suspenzija');
+    Route::post('/firme/{firma}/raskini', [PlatformaController::class, 'raskini'])->name('raskini');
     Route::get('/firme/{firma}/ovlascenje', [PlatformaController::class, 'ovlascenje'])->name('ovlascenje');
 });
 

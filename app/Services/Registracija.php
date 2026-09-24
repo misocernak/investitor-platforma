@@ -86,6 +86,46 @@ class Registracija
         }
     }
 
+    /**
+     * Raskida vlasništvo firme nad profilom na Temelju (npr. nalog je otvorio neko ko nije vlasnik firme).
+     * Temelj skida vezu i oglase, nalog se zatvara, a matični broj je slobodan za novu registraciju.
+     * Vraća [uspeh, poruka za admina].
+     */
+    public static function raskini(Tenant $firma, string $razlog, bool $obrisiOpis): array
+    {
+        [$ok, $odg, $kod] = TemeljApi::posalji('/api/v1/veza/raskini', [
+            'tenant_id' => $firma->id,
+            'razlog' => $razlog,
+            'obrisi_opis' => $obrisiOpis,
+        ]);
+        if (! $ok) {
+            return [false, $kod === 0
+                ? 'Temelj trenutno nije dostupan — ništa nije promenjeno. Pokušajte ponovo za minut.'
+                : 'Temelj je odbio zahtev ('.($odg['greska'] ?? 'HTTP '.$kod).') — ništa nije promenjeno.'];
+        }
+
+        $firma->forceFill([
+            'status' => 'raskinut',
+            'razlog_odbijanja' => $razlog,
+            'temelj_veza_status' => null,
+            'temelj_veza_poruka' => null,
+            'temelj_profil_url' => null,
+            'temelj_veza_provereno_at' => now(),
+        ])->save();
+        AuditLog::zabelezi('raskinuto_vlasnistvo', $firma, ['razlog' => $razlog, 'obrisan_opis' => $obrisiOpis]);
+
+        if ($vlasnik = $firma->vlasnik) {
+            self::email($vlasnik->email, 'Nalog firme je zatvoren — Temelj Investitor', [
+                'naslov' => 'Nalog firme je zatvoren',
+                'tekst' => 'Nalog firme '.$firma->naziv.' na Temelj Investitoru je zatvoren i više nije povezan sa profilom na Temelju. Razlog: '.$razlog.' Ako mislite da je u pitanju greška, odgovorite na ovaj email.',
+                'dugme' => null,
+                'link' => null,
+            ]);
+        }
+
+        return [true, 'Vlasništvo je raskinuto: veza sa Temeljem i oglasi su uklonjeni, nalog je zatvoren. Pravi vlasnik sada može da registruje firmu (MB '.$firma->maticni_broj.').'];
+    }
+
     /** Šalje jednostavan email; greška u slanju ne sme da prekine registraciju. */
     public static function email(string $za, string $naslov, array $podaci): void
     {

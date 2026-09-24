@@ -25,6 +25,7 @@ class Tenant extends Model
         'aktivan' => 'Aktivan',
         'odbijen' => 'Odbijen',
         'suspendovan' => 'Suspendovan',
+        'raskinut' => 'Vlasništvo raskinuto',
     ];
 
     public function aktivan(): bool

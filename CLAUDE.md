@@ -54,6 +54,7 @@ Obavezno kad se menjaju rute ili config — keširane rute inače ne vide novu r
 - Fotografije oglasa su u `public/oglasi-slike/` (disk `oglasi`), Temelj ih preuzima po URL-u (APP_URL mora biti tačan domen).
 
 ## Registracija firmi i admin platforme
+- Raskid vlasništva (platforma → firma → "Raskini vlasništvo"): Temelj `/api/v1/veza/raskini` skida vezu i oglase (opciono briše opis/sajt), firma dobija status `raskinut`, a MB je slobodan za novu registraciju.
 - Firma se registruje sama (`/registracija`): MB → podaci iz APR-a preko Temelja (`/api/v1/firma`), lice, funkcija, punomoćje (obavezno samo za ovlašćeno lice). Status firme: `na_cekanju` → `aktivan` / `odbijen` / `suspendovan`.
 - Odobrava **admin platforme** (uloga `Platforma`, `tenant_id` = null, panel `/platforma`). Odobrenje je jedina provera: aktivira firmu i šalje `odobreno_na_platformi` Temelju (veza odmah odobrena, profil investitora se pravi ako ne postoji).
 - `TenantScope`: prijavljen korisnik bez firme ne vidi NIJEDAN podatak firmi (`1 = 0`). Middleware `firma` pušta u aplikaciju samo aktivne firme.

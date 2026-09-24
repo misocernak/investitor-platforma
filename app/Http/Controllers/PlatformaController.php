@@ -62,6 +62,23 @@ class PlatformaController extends Controller
             : 'Nalog firme je ponovo aktivan.');
     }
 
+    /** Raskid vlasništva nad profilom na Temelju — oslobađa matični broj za pravog vlasnika. */
+    public function raskini(Request $request, Tenant $firma)
+    {
+        abort_unless(in_array($firma->status, ['aktivan', 'suspendovan'], true), 422);
+        $data = $request->validate([
+            'razlog' => ['required', 'string', 'max:255'],
+            'obrisi_opis' => ['nullable', 'boolean'],
+        ], [
+            'razlog.required' => 'Upišite razlog — dobija ga vlasnik naloga.',
+        ]);
+        [$ok, $poruka] = Registracija::raskini($firma, $data['razlog'], (bool) ($data['obrisi_opis'] ?? false));
+
+        return $ok
+            ? redirect()->route('platforma.show', $firma)->with('uspesno', $poruka)
+            : back()->withInput()->withErrors(['razlog' => $poruka]);
+    }
+
     public function ovlascenje(Tenant $firma)
     {
         abort_unless($firma->ovlascenje_putanja && Storage::disk('documents')->exists($firma->ovlascenje_putanja), 404);

@@ -9,13 +9,18 @@
 @endif
 <div class="kartica p-space-lg flex flex-col gap-space-md">
   <div class="flex items-start gap-space-md">
-    <span class="w-11 h-11 rounded-full flex items-center justify-center shrink-0 {{ $status === 'odbijen' ? 'bg-error-container text-on-error-container' : ($status === 'suspendovan' ? 'bg-surface-container-high text-on-surface' : 'bg-amber-50 text-amber-700') }}">
-      <span class="material-symbols-outlined text-[24px]">{{ $status === 'odbijen' ? 'block' : ($status === 'suspendovan' ? 'pause' : 'hourglass_top') }}</span>
+    <span class="w-11 h-11 rounded-full flex items-center justify-center shrink-0 {{ in_array($status, ['odbijen', 'raskinut'], true) ? 'bg-error-container text-on-error-container' : ($status === 'suspendovan' ? 'bg-surface-container-high text-on-surface' : 'bg-amber-50 text-amber-700') }}">
+      <span class="material-symbols-outlined text-[24px]">{{ in_array($status, ['odbijen', 'raskinut'], true) ? 'block' : ($status === 'suspendovan' ? 'pause' : 'hourglass_top') }}</span>
     </span>
     <div class="flex flex-col gap-1">
       @if($status === 'odbijen')
         <h1 class="font-headline-md text-headline-md">Zahtev nije odobren</h1>
         <p class="font-body-md text-body-md text-on-surface-variant">Nismo mogli da potvrdimo podatke firme {{ $firma->naziv }}.</p>
+        @if($firma->razlog_odbijanja)<p class="font-body-md text-body-md"><strong>Razlog:</strong> {{ $firma->razlog_odbijanja }}</p>@endif
+        <p class="font-body-md text-body-md text-on-surface-variant">Ako mislite da je u pitanju greška, odgovorite na email koji ste dobili.</p>
+      @elseif($status === 'raskinut')
+        <h1 class="font-headline-md text-headline-md">Nalog firme je zatvoren</h1>
+        <p class="font-body-md text-body-md text-on-surface-variant">Nalog firme {{ $firma->naziv }} više nije povezan sa profilom na Temelju.</p>
         @if($firma->razlog_odbijanja)<p class="font-body-md text-body-md"><strong>Razlog:</strong> {{ $firma->razlog_odbijanja }}</p>@endif
         <p class="font-body-md text-body-md text-on-surface-variant">Ako mislite da je u pitanju greška, odgovorite na email koji ste dobili.</p>
       @elseif($status === 'suspendovan')

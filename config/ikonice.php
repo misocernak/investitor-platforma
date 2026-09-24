@@ -53,6 +53,7 @@ return [
     'info',
     'left_panel_close',
     'link',
+    'link_off',
     'logout',
     'mail',
     'menu',
