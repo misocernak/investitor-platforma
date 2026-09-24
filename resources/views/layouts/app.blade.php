@@ -31,6 +31,7 @@
     $nav = [['claims.index', 'Moje reklamacije', 'build_circle', ['claims.*']]];
   }
   if ($currentUser && $currentUser->mozeAdministrirati()) {
+    $nav[] = ['recenzije.index', 'Recenzije kupaca', 'reviews', ['recenzije.*']];
     $nav[] = ['users.index', 'Korisnici i uloge', 'group', ['users.*']];
   }
   $jePlatforma = $currentUser?->jePlatforma();

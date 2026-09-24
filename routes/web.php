@@ -11,6 +11,7 @@ use App\Http\Controllers\PlatformaController;
 use App\Http\Controllers\RegistracijaController;
 use App\Http\Controllers\OglasController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\RecenzijaKupacaController;
 use App\Http\Controllers\TemeljVezaController;
 use App\Http\Controllers\UpitController;
 use App\Http\Controllers\UnitController;
@@ -91,6 +92,8 @@ Route::middleware(['auth', 'firma'])->group(function () {
         Route::post('/temelj/veza/proveri', [TemeljVezaController::class, 'proveri'])->name('temelj.veza.proveri');
         Route::get('/temelj/profil', [TemeljVezaController::class, 'profil'])->middleware('role:Vlasnik,Administrator')->name('temelj.profil');
         Route::post('/temelj/profil', [TemeljVezaController::class, 'sacuvajProfil'])->middleware('role:Vlasnik,Administrator');
+        Route::get('/recenzije', [RecenzijaKupacaController::class, 'index'])->middleware('role:Vlasnik,Administrator')->name('recenzije.index');
+        Route::post('/recenzije/odgovor', [RecenzijaKupacaController::class, 'odgovor'])->middleware('role:Vlasnik,Administrator')->name('recenzije.odgovor');
         Route::get('/upiti', [UpitController::class, 'index'])->name('upiti.index');
         Route::get('/upiti/{upit}', [UpitController::class, 'show'])->name('upiti.show');
         Route::patch('/upiti/{upit}', [UpitController::class, 'update'])->name('upiti.update');
