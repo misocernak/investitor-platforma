@@ -19,9 +19,14 @@
       <span class="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">verified</span></span>
       <span><strong>Firma je povezana sa Temeljem.</strong> <span class="text-on-surface-variant">Oglasi se objavljuju odmah, a upiti kupaca stižu u „Upiti kupaca“.</span></span>
     </span>
-    @if($tenant->temelj_profil_url)
-    <a href="{{ $tenant->temelj_profil_url }}" target="_blank" rel="noopener" class="dugme-tiho dugme-malo">Vaš profil na Temelju<span class="material-symbols-outlined text-[16px]">open_in_new</span></a>
-    @endif
+    <span class="flex flex-wrap items-center gap-space-xs">
+      @if($mozeAdmin)
+      <a href="{{ route('temelj.profil') }}" class="dugme-sekundarno dugme-malo"><span class="material-symbols-outlined text-[16px]">edit</span>Opis firme na Temelju</a>
+      @endif
+      @if($tenant->temelj_profil_url)
+      <a href="{{ $tenant->temelj_profil_url }}" target="_blank" rel="noopener" class="dugme-tiho dugme-malo">Vaš profil na Temelju<span class="material-symbols-outlined text-[16px]">open_in_new</span></a>
+      @endif
+    </span>
   </section>
 @else
   <section class="kartica p-space-lg flex flex-col gap-space-md {{ $status === 'na_cekanju' ? 'border-l-4 border-amber-500' : ($status === 'odbijena' ? 'border-l-4 border-error' : '') }}">

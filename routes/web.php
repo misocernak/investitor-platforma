@@ -88,6 +88,8 @@ Route::middleware(['auth', 'firma'])->group(function () {
         Route::post('/oglasi/{oglas}/ponovi', [OglasController::class, 'ponovi'])->name('oglasi.ponovi');
         Route::post('/temelj/veza', [TemeljVezaController::class, 'zatrazi'])->middleware('role:Vlasnik,Administrator')->name('temelj.veza');
         Route::post('/temelj/veza/proveri', [TemeljVezaController::class, 'proveri'])->name('temelj.veza.proveri');
+        Route::get('/temelj/profil', [TemeljVezaController::class, 'profil'])->middleware('role:Vlasnik,Administrator')->name('temelj.profil');
+        Route::post('/temelj/profil', [TemeljVezaController::class, 'sacuvajProfil'])->middleware('role:Vlasnik,Administrator');
         Route::get('/upiti', [UpitController::class, 'index'])->name('upiti.index');
         Route::get('/upiti/{upit}', [UpitController::class, 'show'])->name('upiti.show');
         Route::patch('/upiti/{upit}', [UpitController::class, 'update'])->name('upiti.update');
