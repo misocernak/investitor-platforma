@@ -7,11 +7,10 @@ use App\Models\Oglas;
 use App\Models\OglasSlika;
 use App\Models\Unit;
 use App\Models\Upit;
+use App\Services\ObradaSlika;
 use App\Services\OglasiNaTemelju;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 // Oglašavanje stanova na Temelj.rs — jedna stranica za oglas, sve ostalo automatski
 class OglasController extends Controller
@@ -164,7 +163,7 @@ class OglasController extends Controller
         }
         foreach ($noveSlike as $fajl) {
             $oglas->slike()->create([
-                'putanja' => $this->sacuvajSliku($fajl, $oglas),
+                'putanja' => ObradaSlika::sacuvajOriginal($fajl, $oglas), // obrada (WebP) ide u pozadini
                 'tip' => 'slika',
                 'redosled' => ++$redosled,
             ]);
@@ -173,16 +172,23 @@ class OglasController extends Controller
 
         AuditLog::zabelezi('sacuvan_oglas', $oglas, ['stan' => $unit->oznaka]);
 
-        // 5) Slanje na Temelj ide u pozadini — korisnik odmah dobija odgovor
+        // 5) Obrada fotografija i slanje na Temelj idu u pozadini — korisnik odmah dobija odgovor
         $tenant = auth()->user()->tenant;
-        if (! $tenant->povezanSaTemeljem()) {
-            $poruka = 'Oglas je sačuvan. Pojaviće se na Temelju čim Temelj odobri povezivanje vaše firme (Oglasi na Temelju).';
-        } else {
+        $povezan = $tenant->povezanSaTemeljem();
+        if ($povezan) {
             $oglas->forceFill(['sinhronizovan_at' => null, 'greska_sinhronizacije' => null])->save();
-            $id = $oglas->id;
-            OglasiNaTemelju::uPozadini(fn () => OglasiNaTemelju::sinhronizuj(Oglas::withoutGlobalScopes()->find($id)));
-            $poruka = 'Oglas je sačuvan i šalje se na Temelj — za nekoliko sekundi vidljiv je kupcima.';
         }
+        $id = $oglas->id;
+        OglasiNaTemelju::uPozadini(function () use ($id, $povezan) {
+            $o = Oglas::withoutGlobalScopes()->find($id);
+            ObradaSlika::obradiOglas($o);
+            if ($povezan) {
+                OglasiNaTemelju::sinhronizuj($o->fresh());
+            }
+        });
+        $poruka = $povezan
+            ? 'Oglas je sačuvan i šalje se na Temelj — za nekoliko sekundi vidljiv je kupcima.'
+            : 'Oglas je sačuvan. Pojaviće se na Temelju čim Temelj odobri povezivanje vaše firme (Oglasi na Temelju).';
 
         return redirect()->route('units.show', $unit)->with('uspesno', $poruka);
     }
@@ -211,45 +217,6 @@ class OglasController extends Controller
     {
         $ok = OglasiNaTemelju::sinhronizuj($oglas);
         return back()->with('uspesno', $ok ? 'Izmene su poslate na Temelj.' : 'Temelj i dalje ne odgovara — pokušaćemo ponovo automatski.');
-    }
-
-    /**
-     * Čuva fotografiju u dve veličine: do 2000px (stranica stana) i 720px (liste, sličice).
-     * Bez GD-a čuva original. Vraća putanju velike verzije.
-     */
-    private function sacuvajSliku(UploadedFile $fajl, Oglas $oglas): string
-    {
-        $osnova = $oglas->tenant_id.'/'.$oglas->id.'/'.Str::uuid();
-        // Vrlo velike fotografije (preko ~40 MP) ne obrađujemo — premalo memorije na hostingu
-        $dim = @getimagesize($fajl->getRealPath());
-        $izvor = $dim && $dim[0] * $dim[1] <= 40_000_000 && function_exists('imagecreatefromstring')
-            ? @imagecreatefromstring((string) file_get_contents($fajl->getRealPath()))
-            : null;
-        if ($izvor && function_exists('imagejpeg')) {
-            foreach (['' => 2000, '-m' => 720] as $sufiks => $maks) {
-                Storage::disk('oglasi')->put($osnova.$sufiks.'.jpg', $this->smanji($izvor, $maks));
-            }
-            imagedestroy($izvor);
-            return $osnova.'.jpg';
-        }
-        $ime = $osnova.'.'.$fajl->extension();
-        Storage::disk('oglasi')->putFileAs(dirname($ime), $fajl, basename($ime));
-        return $ime;
-    }
-
-    private function smanji($izvor, int $maks): string
-    {
-        [$w, $h] = [imagesx($izvor), imagesy($izvor)];
-        $nw = min($w, $maks);
-        $nh = (int) round($h * $nw / $w);
-        $slika = imagecreatetruecolor($nw, $nh);
-        imagefill($slika, 0, 0, imagecolorallocate($slika, 255, 255, 255));
-        imagecopyresampled($slika, $izvor, 0, 0, 0, 0, $nw, $nh, $w, $h);
-        imageinterlace($slika, true);
-        ob_start();
-        imagejpeg($slika, null, $maks > 1000 ? 84 : 80);
-        imagedestroy($slika);
-        return ob_get_clean();
     }
 
     /** Naslovna fotografija ide prva, ostale zadržavaju svoj redosled. */

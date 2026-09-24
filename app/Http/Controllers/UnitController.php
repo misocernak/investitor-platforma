@@ -155,4 +155,24 @@ class UnitController extends Controller
 
         return back()->with('uspesno', $poruka);
     }
+
+    /** Brza promena prodajnog statusa (dugmad u dosijeu stana i u oglasima). */
+    public function brziStatus(Request $request, Unit $unit)
+    {
+        $novi = $request->validate(['status' => ['required', 'in:Za_prodaju,Rezervisan,Prodat_u_procesu_uknjizenja']])['status'];
+        $stari = $unit->status;
+        if ($stari === $novi) {
+            return back();
+        }
+        $unit->update(['status' => $novi]);
+        AuditLog::zabelezi('promena_statusa_stana', $unit, ['stari' => $stari, 'novi' => $novi]);
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\OglasiNaTemelju::posleIzmeneStana($unit->fresh()));
+
+        $imaOglas = $unit->oglas()->where('status', '!=', 'skinut')->exists();
+        return back()->with('uspesno', match ($novi) {
+            'Rezervisan' => 'Stan je označen kao rezervisan.'.($imaOglas ? ' Na Temelju piše „Rezervisano“.' : ''),
+            'Za_prodaju' => 'Stan je ponovo u prodaji.'.($unit->oglas ? ' Oglas možete ponovo da aktivirate u „Oglasi na Temelju“.' : ''),
+            default => 'Stan je označen kao prodat.'.($imaOglas ? ' Oglas se uklanja sa Temelja.' : '').' Upišite kupca u dosijeu stana.',
+        });
+    }
 }

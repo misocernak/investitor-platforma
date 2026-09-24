@@ -17,7 +17,10 @@
 
 <x-zaglavlje :naslov="'Stan '.$stan->oznaka" :putanja="$putanja"
   :opis="collect([$zgrada?->naziv, $stan->sprat ? 'sprat '.$stan->sprat : null, $stan->kvadratura ? number_format($stan->kvadratura, 2, ',', '.').' m²' : null])->filter()->implode(' · ')">
-  <x-slot:uzNaslov><x-status :v="$stan->status" /></x-slot:uzNaslov>
+  <x-slot:uzNaslov>
+    <x-status :v="$stan->status" />
+  </x-slot:uzNaslov>
+  @include('units._brzi_status')
   <button type="button" data-modal-open="modal-dokument" class="dugme-sekundarno"><span class="material-symbols-outlined text-[18px]">upload_file</span>Dodaj dokument</button>
   <button type="button" data-modal-open="modal-nova-reklamacija" class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">add</span>Nova reklamacija</button>
 </x-zaglavlje>

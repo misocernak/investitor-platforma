@@ -32,7 +32,8 @@
         <tr>
           <th>Stan</th>
           <th>Cena</th>
-          <th>Stanje</th>
+          <th>Stanje oglasa</th>
+          <th>Status stana</th>
           <th class="text-center">Upiti</th>
           <th class="text-right">Akcije</th>
         </tr>
@@ -63,6 +64,7 @@
             <x-oglas-stanje :oglas="$oglas" :tenant="$tenant" />
             @if($stan->status === 'Rezervisan' && $oglas->status !== 'skinut')<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">prikazuje se kao „Rezervisano“</div>@endif
           </td>
+          <td>@include('units._brzi_status')</td>
           <td class="text-center">
             @if($up)
               <a href="{{ route('upiti.index') }}" class="inline-flex items-center gap-1 {{ $up->novih ? 'font-semibold text-emerald-700' : 'text-on-surface-variant' }}">{{ $up->ukupno }}@if($up->novih)<span class="cip bg-emerald-50 text-emerald-800">{{ $up->novih }} novo</span>@endif</a>

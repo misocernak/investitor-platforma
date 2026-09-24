@@ -20,7 +20,7 @@ class OglasSlika extends Model
     /** Umanjena verzija (720px) za liste i sličice; ako ne postoji, velika. */
     public function urlMala(): string
     {
-        $mala = preg_replace('/\.jpg$/', '-m.jpg', $this->putanja);
+        $mala = preg_replace('/\.(jpg|webp)$/', '-m.$1', $this->putanja);
         return $mala !== $this->putanja && Storage::disk('oglasi')->exists($mala)
             ? url('oglasi-slike/'.$mala)
             : $this->url();
@@ -31,7 +31,7 @@ class OglasSlika extends Model
     {
         $deljena = static::where('putanja', $this->putanja)->where('id', '!=', $this->id)->exists();
         if (! $deljena) {
-            Storage::disk('oglasi')->delete([$this->putanja, preg_replace('/\.jpg$/', '-m.jpg', $this->putanja)]);
+            Storage::disk('oglasi')->delete([$this->putanja, preg_replace('/\.(jpg|webp)$/', '-m.$1', $this->putanja)]);
         }
         $this->delete();
     }

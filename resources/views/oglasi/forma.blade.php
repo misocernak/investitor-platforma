@@ -32,6 +32,11 @@
   @endif
 </x-zaglavlje>
 
+<section class="kartica px-space-lg py-space-md flex flex-wrap items-center justify-between gap-space-sm">
+  <span class="font-body-md text-body-md text-on-surface-variant">Status stana — kad ga rezervišete ili prodate, kliknite ovde. Oglas se sam ažurira.</span>
+  @include('units._brzi_status')
+</section>
+
 @unless($tenant->povezanSaTemeljem())
   @include('oglasi._veza')
 @endunless

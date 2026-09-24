@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/zgrade/{building}/stanovi', [UnitController::class, 'store'])->name('units.store');
         Route::get('/stanovi/{unit}', [UnitController::class, 'show'])->name('units.show');
         Route::patch('/stanovi/{unit}', [UnitController::class, 'update'])->name('units.update');
+        Route::post('/stanovi/{unit}/brzi-status', [UnitController::class, 'brziStatus'])->name('units.status');
 
         Route::get('/dokumenti', [DocumentController::class, 'index'])->name('documents.index');
         Route::post('/dokumenti', [DocumentController::class, 'store'])->name('documents.store');
