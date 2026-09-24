@@ -96,7 +96,9 @@
       <span class="font-label-md text-label-md">{{ $slike->isEmpty() ? 'Dodajte fotografije' : 'Dodajte još fotografija' }}</span>
       <span class="font-body-sm text-body-sm text-on-surface-variant">Kliknite ili prevucite fajlove ovde · JPG, PNG, WebP · do 15 MB po fotografiji</span>
       <input type="file" id="nove-slike" name="slike[]" multiple accept="image/jpeg,image/png,image/webp" class="sr-only">
+      <input type="file" id="nove-slike-male" name="slike_male[]" multiple class="hidden" tabindex="-1" aria-hidden="true">
     </label>
+    <p class="font-body-sm text-body-sm text-on-surface-variant hidden" id="slike-status"></p>
     <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-space-sm" id="pregled-slika"></div>
     @error('slike')<p class="font-body-md text-body-md text-error">{{ $message }}</p>@enderror
     @error('slike.*')<p class="font-body-md text-body-md text-error">{{ $message }}</p>@enderror
@@ -240,24 +242,84 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function () {
-  // --- Pregled novih fotografija (i prevlačenje fajlova na zonu) ---
-  const unos = document.getElementById('nove-slike'), pregled = document.getElementById('pregled-slika'), zona = document.getElementById('zona-slika');
-  const prikazi = () => {
-    pregled.innerHTML = '';
-    Array.from(unos.files).forEach(f => {
-      const d = document.createElement('div');
-      d.className = 'aspect-[4/3] rounded overflow-hidden bg-surface-container';
-      const i = document.createElement('img');
-      i.className = 'w-full h-full object-cover';
-      i.src = URL.createObjectURL(f);
-      d.appendChild(i);
-      pregled.appendChild(d);
-    });
+  // --- Fotografije se pripremaju u browseru: ispravna rotacija, 1600px i 720px, WebP ~250 KB / ~60 KB.
+  //     Na server ide nekoliko stotina KB umesto 5–15 MB po fotografiji, pa je čuvanje brzo. ---
+  const unos = document.getElementById('nove-slike'), male = document.getElementById('nove-slike-male');
+  const pregled = document.getElementById('pregled-slika'), zona = document.getElementById('zona-slika');
+  const status = document.getElementById('slike-status');
+  const dugme = document.querySelector('#oglas-forma button[type=submit]');
+  const tekstDugmeta = dugme ? dugme.innerHTML : '';
+  let brojac = 0;
+
+  const ucitajBitmap = async (f) => {
+    try { return await createImageBitmap(f, { imageOrientation: 'from-image' }); } catch (e) {}
+    return await new Promise((ok, ne) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ne; i.src = URL.createObjectURL(f); });
   };
-  unos.addEventListener('change', prikazi);
+  const uBlob = (c, tip, q) => new Promise(ok => c.toBlob(ok, tip, q));
+  const kodiraj = async (slika, maxW, ciljKb) => {
+    const w = slika.width, h = slika.height, nw = Math.min(w, maxW), nh = Math.round(h * nw / w);
+    const c = document.createElement('canvas');
+    c.width = nw; c.height = nh;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, nw, nh);
+    ctx.drawImage(slika, 0, 0, nw, nh);
+    let blob = null;
+    for (const q of [0.82, 0.74, 0.66, 0.58, 0.5, 0.42]) {
+      blob = await uBlob(c, 'image/webp', q);
+      if (!blob || blob.type !== 'image/webp') blob = await uBlob(c, 'image/jpeg', q); // stariji Safari ne pravi WebP
+      if (blob && blob.size <= ciljKb * 1024) break;
+    }
+    return blob;
+  };
+  const kb = n => Math.round(n / 1024) + ' KB';
+
+  const pripremi = async (fajlovi) => {
+    fajlovi = Array.from(fajlovi).filter(f => f.type.startsWith('image/'));
+    if (!fajlovi.length) return;
+    let veliki, mali;
+    try { veliki = new DataTransfer(); mali = new DataTransfer(); } catch (e) { return prikazi(fajlovi); } // vrlo stari browser: šalju se originali
+    if (dugme) { dugme.disabled = true; }
+    status.classList.remove('hidden');
+    pregled.innerHTML = '';
+    let ukupnoPre = 0, ukupnoPosle = 0;
+    for (let i = 0; i < fajlovi.length; i++) {
+      const f = fajlovi[i];
+      status.textContent = 'Pripremam fotografije ' + (i + 1) + ' / ' + fajlovi.length + '…';
+      if (dugme) dugme.textContent = 'Pripremam fotografije…';
+      ukupnoPre += f.size;
+      try {
+        const bmp = await ucitajBitmap(f);
+        const b = await kodiraj(bmp, 1600, 250), m = await kodiraj(bmp, 720, 60);
+        const ext = b.type === 'image/webp' ? 'webp' : 'jpg', br = ++brojac;
+        veliki.items.add(new File([b], 'opt-' + br + '.' + ext, { type: b.type }));
+        mali.items.add(new File([m], 'opt-' + br + '-m.' + ext, { type: m.type }));
+        ukupnoPosle += b.size;
+        dodajPregled(URL.createObjectURL(m), kb(b.size));
+      } catch (e) {
+        veliki.items.add(f); // nije uspelo u browseru — server će je obraditi
+        ukupnoPosle += f.size;
+        dodajPregled(URL.createObjectURL(f), kb(f.size));
+      }
+    }
+    unos.files = veliki.files;
+    male.files = mali.files;
+    status.textContent = fajlovi.length + ' fotografija spremno · ' + kb(ukupnoPre) + ' → ' + kb(ukupnoPosle);
+    if (dugme) { dugme.disabled = false; dugme.innerHTML = tekstDugmeta; }
+  };
+  const dodajPregled = (src, oznaka) => {
+    const d = document.createElement('div');
+    d.className = 'relative aspect-[4/3] rounded overflow-hidden bg-surface-container';
+    d.innerHTML = '<img class="w-full h-full object-cover" alt=""><span class="absolute bottom-1 right-1 cip bg-surface-container-lowest/90 text-on-surface"></span>';
+    d.querySelector('img').src = src;
+    d.querySelector('span').textContent = oznaka;
+    pregled.appendChild(d);
+  };
+  const prikazi = (fajlovi) => { pregled.innerHTML = ''; Array.from(fajlovi).forEach(f => dodajPregled(URL.createObjectURL(f), kb(f.size))); };
+
+  unos.addEventListener('change', () => pripremi(unos.files));
   ['dragover', 'dragenter'].forEach(t => zona.addEventListener(t, e => { e.preventDefault(); zona.classList.add('bg-surface-container'); }));
   ['dragleave', 'drop'].forEach(t => zona.addEventListener(t, () => zona.classList.remove('bg-surface-container')));
-  zona.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) { unos.files = e.dataTransfer.files; prikazi(); } });
+  zona.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) pripremi(e.dataTransfer.files); });
 
   // --- Mapa: klik postavlja tačku zgrade ---
   const el = document.getElementById('mapa');

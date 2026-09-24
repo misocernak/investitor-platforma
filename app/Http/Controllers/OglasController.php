@@ -74,6 +74,8 @@ class OglasController extends Controller
             'terasa_m2' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'slike' => ['nullable', 'array'],
             'slike.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'slike_male' => ['nullable', 'array'],
+            'slike_male.*' => ['image', 'mimes:jpg,jpeg,webp', 'max:2048'],
             'obrisi' => ['nullable', 'array'],
             'obrisi.*' => ['integer'],
             'tlocrt' => ['nullable', 'array'],
@@ -161,9 +163,14 @@ class OglasController extends Controller
         foreach ($kopije as $k) {
             $oglas->slike()->create(['putanja' => $k->putanja, 'tip' => $k->tip, 'redosled' => ++$redosled]);
         }
+        // Fotografije pripremljene u browseru ("opt-N.webp" + "opt-N-m.webp") čuvaju se odmah;
+        // ostale (npr. vrlo star browser) obrađuje server u pozadini
+        $maleSlike = collect($request->file('slike_male', []))->keyBy(fn ($f) => $f->getClientOriginalName());
         foreach ($noveSlike as $fajl) {
+            $ime = $fajl->getClientOriginalName();
+            $mala = preg_match('/^opt-(\d+)\.(webp|jpg)$/', $ime, $m) ? $maleSlike->get("opt-{$m[1]}-m.{$m[2]}") : null;
             $oglas->slike()->create([
-                'putanja' => ObradaSlika::sacuvajOriginal($fajl, $oglas), // obrada (WebP) ide u pozadini
+                'putanja' => $mala ? ObradaSlika::sacuvajGotovu($fajl, $mala, $oglas) : ObradaSlika::sacuvajOriginal($fajl, $oglas),
                 'tip' => 'slika',
                 'redosled' => ++$redosled,
             ]);
@@ -181,7 +188,9 @@ class OglasController extends Controller
         $id = $oglas->id;
         OglasiNaTemelju::uPozadini(function () use ($id, $povezan) {
             $o = Oglas::withoutGlobalScopes()->find($id);
-            ObradaSlika::obradiOglas($o);
+            if (ObradaSlika::imaNeobradjenih($o)) {
+                ObradaSlika::obradiOglas($o);
+            }
             if ($povezan) {
                 OglasiNaTemelju::sinhronizuj($o->fresh());
             }

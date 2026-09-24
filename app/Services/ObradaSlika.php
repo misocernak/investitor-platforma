@@ -29,6 +29,26 @@ class ObradaSlika
         return $oglas->tenant_id.'/'.$oglas->id.'/'.$ime;
     }
 
+    /**
+     * Fotografija već pripremljena u browseru (WebP/JPG, do 1600px) + njena mala verzija:
+     * samo se sačuvaju, bez obrade na serveru. Vraća putanju velike verzije.
+     */
+    public static function sacuvajGotovu(UploadedFile $velika, UploadedFile $mala, Oglas $oglas): string
+    {
+        $ext = strtolower(pathinfo($velika->getClientOriginalName(), PATHINFO_EXTENSION)) === 'webp' ? 'webp' : 'jpg';
+        $folder = $oglas->tenant_id.'/'.$oglas->id;
+        $ime = (string) Str::uuid();
+        Storage::disk('oglasi')->putFileAs($folder, $velika, $ime.'.'.$ext);
+        Storage::disk('oglasi')->putFileAs($folder, $mala, $ime.'-m.'.$ext);
+        return $folder.'/'.$ime.'.'.$ext;
+    }
+
+    /** Da li oglas ima fotografiju koja još čeka obradu na serveru. */
+    public static function imaNeobradjenih(Oglas $oglas): bool
+    {
+        return $oglas->slike()->where('putanja', 'like', '%/izvorno-%')->exists();
+    }
+
     public static function neobradjena(OglasSlika $slika): bool
     {
         return str_contains(basename($slika->putanja), 'izvorno-');
