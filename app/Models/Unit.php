@@ -14,7 +14,7 @@ class Unit extends Model
         'cena', 'kupac_id', 'status', 'arhiviran',
     ];
 
-    protected $casts = ['arhiviran' => 'boolean'];
+    protected $casts = ['arhiviran' => 'boolean', 'temelj_kupac_at' => 'datetime'];
 
     public function building()
     {

@@ -53,6 +53,33 @@
           <x-polje labela="Email" za="st-email"><input class="polje" id="st-email" name="kupac_email" type="email" value="{{ $stan->customer->email ?? '' }}"/></x-polje>
           <x-polje labela="Telefon" za="st-tel"><input class="polje" id="st-tel" name="kupac_telefon" value="{{ $stan->customer->telefon ?? '' }}"/></x-polje>
         </div>
+        @php
+          $naTemelju = $currentTenant?->povezanSaTemeljem();
+          $prodatStan = ! in_array($stan->status, \App\Services\KupciNaTemelju::NEPRODAT, true);
+        @endphp
+        @if($naTemelju)
+        <div class="rounded bg-surface-container-low px-space-md py-space-sm flex flex-col gap-space-xs">
+          <div class="flex items-center gap-space-sm font-body-md text-body-md">
+            <span class="material-symbols-outlined text-[18px] {{ $stan->temelj_kupac_status === 'potvrdjen' ? 'text-emerald-700' : 'text-on-surface-variant' }}">{{ $stan->temelj_kupac_status === 'potvrdjen' ? 'verified_user' : ($stan->temelj_kupac_status === 'poslat' ? 'mail' : 'info') }}</span>
+            @if($stan->temelj_kupac_status === 'potvrdjen')
+              <span><strong>Kupac je potvrdio stan na Temelju</strong>@if($stan->temelj_kupac_at) · {{ $stan->temelj_kupac_at->format('d.m.Y.') }}@endif</span>
+            @elseif($stan->temelj_kupac_status === 'poslat')
+              <span><strong>Poziv je poslat kupcu</strong> na {{ $stan->temelj_kupac_email }}@if($stan->temelj_kupac_at) · {{ $stan->temelj_kupac_at->format('d.m.Y.') }}@endif — čeka potvrdu</span>
+            @else
+              <span class="text-on-surface-variant">Kad je stan prodat i upisan je email kupca, Temelj mu šalje poziv da stan potvrdi u svom profilu.</span>
+            @endif
+          </div>
+          @if($stan->temelj_kupac_status)
+          <div class="flex flex-wrap gap-space-sm">
+            @if($stan->temelj_kupac_status === 'poslat' && $prodatStan)
+            <button type="submit" form="kupac-ponovo" class="dugme-tiho dugme-malo"><span class="material-symbols-outlined text-[16px]">send</span>Pošalji poziv ponovo</button>
+            @endif
+            <button type="submit" form="kupac-ukloni" class="dugme-tiho dugme-malo text-error"><span class="material-symbols-outlined text-[16px]">link_off</span>Ukloni pristup kupcu</button>
+          </div>
+          @endif
+          @error('kupac')<p class="font-body-sm text-body-sm text-error">{{ $message }}</p>@enderror
+        </div>
+        @endif
         @if($stan->customer && ($stan->customer->telefon || $stan->customer->email))
         <div class="flex flex-wrap gap-space-sm">
           @if($stan->customer->telefon)<a href="tel:{{ preg_replace('/[^0-9+]/', '', $stan->customer->telefon) }}" class="dugme-sekundarno dugme-malo"><span class="material-symbols-outlined text-[16px]">call</span>Pozovi</a>@endif
@@ -66,6 +93,9 @@
         <button class="dugme-primarno"><span class="material-symbols-outlined text-[18px]">save</span>Sačuvaj izmene</button>
       </div>
     </form>
+    {{-- Forme za poziv kupcu (dugmad su u formi iznad, povezana preko form="...") --}}
+    <form id="kupac-ponovo" method="POST" action="{{ route('units.kupac.ponovo', $stan) }}" class="hidden">@csrf</form>
+    <form id="kupac-ukloni" method="POST" action="{{ route('units.kupac.ukloni', $stan) }}" class="hidden" data-potvrdi="Ukloniti kupcu pristup ovom stanu na Temelju?">@csrf</form>
   </section>
 
   <div class="lg:col-span-7 flex flex-col gap-space-lg">

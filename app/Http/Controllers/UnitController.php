@@ -148,12 +148,38 @@ class UnitController extends Controller
         // Oglas na Temelju prati stan: prodat stan se sam skida, izmene cene/podataka se šalju
         $imaoOglas = $unit->oglas()->where('status', '!=', 'skinut')->exists();
         \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\OglasiNaTemelju::posleIzmeneStana($unit->fresh()));
+        $promenjenStatus = $stariStatus !== $unit->status;
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\KupciNaTemelju::posleIzmeneStana($unit->id, $promenjenStatus));
         $poruka = 'Podaci jedinice su sačuvani.';
+        $emailKupca = mb_strtolower(trim((string) $unit->customer()->value('email')));
+        if ($emailKupca !== '' && ! in_array($unit->status, \App\Services\KupciNaTemelju::NEPRODAT, true)
+            && $unit->temelj_kupac_email !== $emailKupca && auth()->user()->tenant?->povezanSaTemeljem()) {
+            $poruka .= ' Kupcu se šalje poziv da stan potvrdi na Temelju.';
+        }
         if ($imaoOglas && !in_array($unit->status, \App\Models\Oglas::STATUSI_U_PRODAJI, true)) {
             $poruka .= ' Stan više nije u prodaji, pa je oglas uklonjen sa Temelja.';
         }
 
         return back()->with('uspesno', $poruka);
+    }
+
+    /** Ponovno slanje poziva kupcu na Temelj (npr. nije dobio mejl). */
+    public function kupacPonovo(Unit $unit)
+    {
+        if (! \App\Services\KupciNaTemelju::ponoviPoziv($unit)) {
+            return back()->withErrors(['kupac' => 'Poziv nije poslat — proverite email kupca i vezu sa Temeljem, pa pokušajte ponovo.']);
+        }
+        AuditLog::zabelezi('temelj_kupac_ponovo', $unit);
+        return back()->with('uspesno', 'Poziv je ponovo poslat kupcu.');
+    }
+
+    /** Oduzimanje pristupa stanu na Temelju (pogrešan email, raskinuta prodaja). */
+    public function kupacUkloni(Unit $unit)
+    {
+        if (! \App\Services\KupciNaTemelju::ukloniPristup($unit)) {
+            return back()->withErrors(['kupac' => 'Temelj trenutno nije dostupan — pokušajte ponovo za minut.']);
+        }
+        return back()->with('uspesno', 'Kupac više nema pristup ovom stanu na Temelju. Ako je email bio pogrešan, ispravite ga i sačuvajte — poziv ide na novu adresu.');
     }
 
     /** Brza promena prodajnog statusa (dugmad u dosijeu stana i u oglasima). */
@@ -167,6 +193,7 @@ class UnitController extends Controller
         $unit->update(['status' => $novi]);
         AuditLog::zabelezi('promena_statusa_stana', $unit, ['stari' => $stari, 'novi' => $novi]);
         \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\OglasiNaTemelju::posleIzmeneStana($unit->fresh()));
+        \App\Services\OglasiNaTemelju::uPozadini(fn () => \App\Services\KupciNaTemelju::posleIzmeneStana($unit->id, true));
 
         $imaOglas = $unit->oglas()->where('status', '!=', 'skinut')->exists();
         return back()->with('uspesno', match ($novi) {

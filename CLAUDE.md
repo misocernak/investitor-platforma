@@ -49,6 +49,7 @@ Obavezno kad se menjaju rute ili config — keširane rute inače ne vide novu r
 ## Oglasi na Temelju (veza sa Temelj.rs)
 - Server–server JSON POST potpisan HMAC-om (`App\Services\TemeljApi`); ključ `TEMELJ_API_KLJUC` samo u `.env`, isti kao `investitor_api.kljuc` u Temelj `app/config.php`.
 - Temelj → ovde: `POST /api/temelj/upit`, `POST /api/temelj/veza`. Ovde → Temelj: `/api/v1/veza`, `/api/v1/veza/status`, `/api/v1/oglasi`, `/api/v1/upiti/preuzmi`, `/api/v1/profil`.
+- Kupac na Temelju (`App\Services\KupciNaTemelju`): prodat stan + email kupca → Temelj (`/api/v1/kupac/stan`, akcije poziv/status/ukloni) šalje kupcu jednokratan link; kupac potvrđuje stan nalogom sa istom adresom, Temelj javlja `POST /api/temelj/kupac`. Temelj nikad ne otkriva da li email ima nalog. Status "Prodat_u_garanciji" šalje kupcu poziv na recenziju (jednom).
 - Recenzije kupaca (`/recenzije`, Vlasnik/Administrator): čitaju se sa Temelja (`/api/v1/recenzije`), a javni odgovor firme ide na `/api/v1/recenzije/odgovor` (prazan tekst = brisanje). Ovde se ništa ne čuva.
 - Opis firme i veb-sajt (profil investitora na Temelju) uređuju se na `/temelj/profil`, a čuvaju SAMO na Temelju (`investitori.opis`/`sajt`) — ovde nema kolone, stranica ih čita i šalje preko `/api/v1/profil`.
 - Logika u `App\Services\OglasiNaTemelju`; izmena stana/zgrade/projekta automatski šalje oglas, prodat stan skida oglas.

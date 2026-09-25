@@ -24,6 +24,17 @@ class TemeljController extends Controller
         return response()->json(['ok' => (bool) $upit]);
     }
 
+    /** Obaveštenje da je kupac potvrdio stan na Temelju. */
+    public function kupac(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        if ($request->input('status') === 'potvrdjen') {
+            \App\Services\KupciNaTemelju::upisiPotvrdu((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     /** Obaveštenje da je veza firme odobrena, odbijena ili opozvana. */
     public function veza(Request $request)
     {

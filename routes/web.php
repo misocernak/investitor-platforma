@@ -72,6 +72,8 @@ Route::middleware(['auth', 'firma'])->group(function () {
         Route::get('/stanovi/{unit}', [UnitController::class, 'show'])->name('units.show');
         Route::patch('/stanovi/{unit}', [UnitController::class, 'update'])->name('units.update');
         Route::post('/stanovi/{unit}/brzi-status', [UnitController::class, 'brziStatus'])->name('units.status');
+        Route::post('/stanovi/{unit}/kupac-temelj/ponovo', [UnitController::class, 'kupacPonovo'])->middleware('throttle:10,1')->name('units.kupac.ponovo');
+        Route::post('/stanovi/{unit}/kupac-temelj/ukloni', [UnitController::class, 'kupacUkloni'])->name('units.kupac.ukloni');
 
         Route::get('/dokumenti', [DocumentController::class, 'index'])->name('documents.index');
         Route::post('/dokumenti', [DocumentController::class, 'store'])->name('documents.store');
