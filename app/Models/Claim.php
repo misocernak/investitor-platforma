@@ -11,7 +11,7 @@ class Claim extends Model
 
     protected $fillable = [
         'tenant_id', 'stan_id', 'kupac_id', 'datum_prijave', 'tip_problema',
-        'tip_problema_drugo', 'opis', 'status', 'odgovorni_id', 'rok_resavanja',
+        'tip_problema_drugo', 'opis', 'status', 'odgovorni_id', 'rok_resavanja', 'izvor',
     ];
 
     protected $casts = [

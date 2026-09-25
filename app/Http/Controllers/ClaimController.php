@@ -171,19 +171,31 @@ class ClaimController extends Controller
         }
 
         AuditLog::zabelezi('izmena_reklamacije', $claim, array_filter($data));
+        if ($claim->wasChanged('status')) {
+            \App\Services\KupciNaTemelju::obavestiKupca($claim, 'status');
+        }
 
         return back()->with('uspesno', 'Reklamacija je ažurirana.');
     }
 
     public function dodajBelesku(Request $request, Claim $claim)
     {
-        $data = $request->validate(['tekst' => ['required', 'string', 'max:2000']]);
+        $data = $request->validate([
+            'tekst' => ['required', 'string', 'max:2000'],
+            'vidljivo_kupcu' => ['nullable', 'boolean'],
+        ]);
+        // Nadzor/izvođač piše samo interne beleške; poruku kupcu šalje tim firme
+        $kupcu = $request->boolean('vidljivo_kupcu') && ! auth()->user()->jeNadzor();
 
         $claim->notes()->create([
             'user_id' => auth()->id(),
             'tekst' => $data['tekst'],
+            'vidljivo_kupcu' => $kupcu,
         ]);
+        if ($kupcu) {
+            \App\Services\KupciNaTemelju::obavestiKupca($claim, 'poruka');
+        }
 
-        return back()->with('uspesno', 'Beleška je dodata.');
+        return back()->with('uspesno', $kupcu ? 'Poruka je poslata kupcu — vidi je na Temelju.' : 'Beleška je dodata.');
     }
 }

@@ -31,5 +31,8 @@ Route::middleware('throttle:120,1')->prefix('temelj')->group(function () {
     Route::post('/veza', [\App\Http\Controllers\Api\TemeljController::class, 'veza']);
     Route::post('/kupac', [\App\Http\Controllers\Api\TemeljController::class, 'kupac']);
     Route::post('/kupac/dokumenti', [\App\Http\Controllers\Api\TemeljController::class, 'kupacDokumenti']);
+    Route::post('/kupac/pregled', [\App\Http\Controllers\Api\TemeljController::class, 'kupacPregled']);
+    Route::post('/kupac/reklamacija', [\App\Http\Controllers\Api\TemeljController::class, 'kupacReklamacija']);
+    Route::post('/kupac/reklamacija-poruka', [\App\Http\Controllers\Api\TemeljController::class, 'kupacPoruka']);
     Route::post('/kupac/dokument-link', [\App\Http\Controllers\Api\TemeljController::class, 'kupacDokumentLink']);
 });

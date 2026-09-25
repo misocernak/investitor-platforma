@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Claim;
+use App\Models\ClaimNote;
 use App\Models\Document;
+use App\Support\Prikaz;
 use App\Models\Tenant;
 use App\Models\Unit;
 
@@ -70,6 +73,151 @@ class KupciNaTemelju
             ->where('vidljivo_kupcu', true)
             ->where(fn ($q) => $q->where('stan_id', $stan->id)
                 ->orWhere(fn ($w) => $w->whereNull('stan_id')->where('zgrada_id', $stan->zgrada_id)));
+    }
+
+    // ------------------------------------------------------------------
+    //  Reklamacije kupca (prijava i prepiska sa Temelja)
+    // ------------------------------------------------------------------
+
+    /** Reklamacije koje kupac vidi: njegov stan i on kao kupac (ne reklamacije prethodnog vlasnika). */
+    public static function reklamacijeKupca(Unit $stan)
+    {
+        return Claim::withoutGlobalScopes()
+            ->where('tenant_id', $stan->tenant_id)
+            ->where('stan_id', $stan->id)
+            ->when($stan->kupac_id, fn ($q) => $q->where('kupac_id', $stan->kupac_id), fn ($q) => $q->whereRaw('1 = 0'));
+    }
+
+    /** Sve za stranicu "Moj stan" na Temelju u jednom odgovoru: dokumenti, reklamacije sa porukama, tipovi problema. */
+    public static function pregled(Unit $stan): array
+    {
+        $dokumenti = self::dokumentiKupca($stan)
+            ->orderByRaw('stan_id IS NULL')->orderByDesc('datum_izdavanja')->orderByDesc('id')
+            ->get(['id', 'stan_id', 'tip', 'naziv', 'datum_izdavanja', 'izdavalac', 'verzija', 'putanja_fajla'])
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'nivo' => $d->stan_id ? 'stan' : 'zgrada',
+                'tip' => Prikaz::label($d->tip),
+                'naziv' => $d->naziv,
+                'datum' => $d->datum_izdavanja?->format('d.m.Y.'),
+                'izdavalac' => $d->izdavalac,
+                'verzija' => $d->verzija,
+                'format' => strtoupper(pathinfo((string) $d->putanja_fajla, PATHINFO_EXTENSION)),
+            ])->values();
+
+        $reklamacije = self::reklamacijeKupca($stan)
+            ->with(['notes' => fn ($q) => $q->where(fn ($w) => $w->where('vidljivo_kupcu', true)->orWhere('od_kupca', true))->reorder('created_at')])
+            ->latest('id')->limit(50)->get()
+            ->map(fn (Claim $r) => [
+                'id' => $r->id,
+                'broj' => 'REK-'.$r->id,
+                'tip' => $r->tip_problema === 'Drugo' && $r->tip_problema_drugo ? $r->tip_problema_drugo : Prikaz::label($r->tip_problema),
+                'opis' => $r->opis,
+                'status' => $r->status,
+                'status_naziv' => Prikaz::label($r->status),
+                'zatvorena' => in_array($r->status, ['Resena', 'Odbijena'], true),
+                'datum' => $r->datum_prijave?->format('d.m.Y.'),
+                'rok' => $r->rok_resavanja?->format('d.m.Y.'),
+                'poruke' => $r->notes->map(fn (ClaimNote $n) => [
+                    'od' => $n->od_kupca ? 'kupac' : 'investitor',
+                    'tekst' => $n->tekst,
+                    'datum' => $n->created_at?->format('d.m.Y. H:i'),
+                ])->values(),
+            ])->values();
+
+        $tipovi = collect(config('statusi.tip_problema'))->mapWithKeys(fn ($t) => [$t => Prikaz::label($t)]);
+
+        return ['dokumenti' => $dokumenti, 'reklamacije' => $reklamacije, 'tipovi' => $tipovi];
+    }
+
+    /** Nova reklamacija kupca sa Temelja. Vraća [reklamacija|null, greška|null]. */
+    public static function prijaviReklamaciju(Unit $stan, string $tip, ?string $tipDrugo, string $opis): array
+    {
+        if (! $stan->kupac_id) {
+            return [null, 'Investitor još nije upisao kupca za ovaj stan.'];
+        }
+        if (! in_array($tip, config('statusi.tip_problema'), true)) {
+            return [null, 'Izaberite vrstu problema.'];
+        }
+        $danas = Claim::withoutGlobalScopes()->where('stan_id', $stan->id)->where('izvor', 'temelj')
+            ->where('created_at', '>', now()->subDay())->count();
+        if ($danas >= 5) {
+            return [null, 'Za danas ste prijavili dovoljno reklamacija za ovaj stan — dopunite postojeće porukom ili pokušajte sutra.'];
+        }
+
+        $rek = new Claim([
+            'stan_id' => $stan->id,
+            'kupac_id' => $stan->kupac_id,
+            'datum_prijave' => now()->toDateString(),
+            'tip_problema' => $tip,
+            'tip_problema_drugo' => $tip === 'Drugo' ? $tipDrugo : null,
+            'opis' => $opis,
+            'status' => 'Prijavljena',
+            'izvor' => 'temelj',
+        ]);
+        $rek->tenant_id = $stan->tenant_id;
+        $rek->save();
+        AuditLog::create([
+            'tenant_id' => $stan->tenant_id, 'user_id' => null, 'akcija' => 'reklamacija_sa_temelja',
+            'model_type' => Claim::class, 'model_id' => $rek->id, 'nove_vrednosti' => ['tip' => $tip],
+        ]);
+        self::javiFirmi($stan->tenant_id, 'Nova reklamacija kupca sa Temelja', 'Kupac stana '.$stan->oznaka.' je prijavio reklamaciju ('.Prikaz::label($tip).').', $rek);
+
+        return [$rek, null];
+    }
+
+    /** Poruka kupca na postojećoj reklamaciji. Vraća grešku ili null. */
+    public static function porukaKupca(Unit $stan, int $reklamacijaId, string $tekst): ?string
+    {
+        $rek = self::reklamacijeKupca($stan)->find($reklamacijaId);
+        if (! $rek) {
+            return 'Reklamacija nije pronađena.';
+        }
+        $danas = ClaimNote::where('claim_id', $rek->id)->where('od_kupca', true)->where('created_at', '>', now()->subDay())->count();
+        if ($danas >= 20) {
+            return 'Poslali ste dovoljno poruka za danas — investitor će vam odgovoriti.';
+        }
+        $rek->notes()->create(['user_id' => null, 'tekst' => $tekst, 'od_kupca' => true, 'vidljivo_kupcu' => true]);
+        $rek->touch();
+        self::javiFirmi($stan->tenant_id, 'Nova poruka kupca — REK-'.$rek->id, 'Kupac stana '.$stan->oznaka.' je poslao poruku na reklamaciji REK-'.$rek->id.'.', $rek);
+
+        return null;
+    }
+
+    /**
+     * Obaveštenje kupcu (mejl šalje Temelj) kad firma promeni status ili pošalje poruku kupcu.
+     * Samo za reklamaciju sadašnjeg kupca koji je potvrdio stan; šalje se posle odgovora.
+     */
+    public static function obavestiKupca(Claim $rek, string $tip): void
+    {
+        $stanId = $rek->stan_id;
+        $kupacId = $rek->kupac_id;
+        dispatch(function () use ($stanId, $kupacId, $tip, $rek) {
+            $stan = Unit::withoutGlobalScopes()->find($stanId);
+            if (! $stan || $stan->temelj_kupac_status !== 'potvrdjen' || ! $kupacId || $stan->kupac_id !== $kupacId || ! self::moze($stan)) {
+                return;
+            }
+            TemeljApi::posalji('/api/v1/kupac/obavestenje', [
+                'tenant_id' => $stan->tenant_id,
+                'stan_id' => $stan->id,
+                'tip' => $tip,
+                'broj' => 'REK-'.$rek->id,
+                'status' => Prikaz::label($rek->status),
+            ]);
+        })->afterResponse();
+    }
+
+    /** Kratko obaveštenje vlasniku firme (email) — bez sadržaja reklamacije, samo link. */
+    private static function javiFirmi(int $tenantId, string $naslov, string $tekst, Claim $rek): void
+    {
+        dispatch(function () use ($tenantId, $naslov, $tekst, $rek) {
+            $vlasnik = Tenant::find($tenantId)?->vlasnik;
+            if ($vlasnik?->email) {
+                Registracija::email($vlasnik->email, $naslov.' — Temelj Investitor', [
+                    'naslov' => $naslov, 'tekst' => $tekst, 'dugme' => 'Otvori reklamaciju', 'link' => route('claims.show', $rek->id),
+                ]);
+            }
+        })->afterResponse();
     }
 
     /** Obaveštenje sa Temelja: kupac je potvrdio stan. */

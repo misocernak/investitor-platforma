@@ -76,6 +76,58 @@ class TemeljController extends Controller
         return response()->json(['ok' => true, 'url' => $url]);
     }
 
+    /** Sve za stranicu "Moj stan" na Temelju (dokumenti + reklamacije + tipovi problema) u jednom pozivu. */
+    public function kupacPregled(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        $stan = \App\Services\KupciNaTemelju::potvrdjenStan((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        if (! $stan) {
+            return response()->json(['ok' => false, 'greska' => 'Nema pristupa.'], 404);
+        }
+
+        return response()->json(['ok' => true] + \App\Services\KupciNaTemelju::pregled($stan));
+    }
+
+    /** Kupac prijavljuje reklamaciju sa Temelja. */
+    public function kupacReklamacija(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        $stan = \App\Services\KupciNaTemelju::potvrdjenStan((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        if (! $stan) {
+            return response()->json(['ok' => false, 'greska' => 'Nema pristupa.'], 404);
+        }
+        $opis = trim((string) $request->input('opis'));
+        $tipDrugo = mb_substr(trim((string) $request->input('tip_drugo')), 0, 120) ?: null;
+        if (mb_strlen($opis) < 10 || mb_strlen($opis) > 3000) {
+            return response()->json(['ok' => false, 'greska' => 'Opišite problem (od 10 do 3000 znakova).'], 422);
+        }
+        [$rek, $greska] = \App\Services\KupciNaTemelju::prijaviReklamaciju($stan, (string) $request->input('tip'), $tipDrugo, $opis);
+        if (! $rek) {
+            return response()->json(['ok' => false, 'greska' => $greska], 422);
+        }
+
+        return response()->json(['ok' => true, 'broj' => 'REK-'.$rek->id]);
+    }
+
+    /** Poruka kupca na reklamaciji. */
+    public function kupacPoruka(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        $stan = \App\Services\KupciNaTemelju::potvrdjenStan((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        if (! $stan) {
+            return response()->json(['ok' => false, 'greska' => 'Nema pristupa.'], 404);
+        }
+        $tekst = trim((string) $request->input('tekst'));
+        if ($tekst === '' || mb_strlen($tekst) > 2000) {
+            return response()->json(['ok' => false, 'greska' => 'Poruka može imati do 2000 znakova.'], 422);
+        }
+        $greska = \App\Services\KupciNaTemelju::porukaKupca($stan, (int) $request->input('reklamacija_id'), $tekst);
+
+        return $greska
+            ? response()->json(['ok' => false, 'greska' => $greska], 422)
+            : response()->json(['ok' => true]);
+    }
+
     /** Obaveštenje da je veza firme odobrena, odbijena ili opozvana. */
     public function veza(Request $request)
     {

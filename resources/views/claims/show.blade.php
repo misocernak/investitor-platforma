@@ -12,12 +12,14 @@
   $jeNadzor = $currentUser->jeNadzor();
   $slike = $rek->files->filter(fn ($f) => preg_match('/\.(jpe?g|png|gif|webp)$/i', $f->putanja_fajla));
   $ostaliPrilozi = $rek->files->diff($slike);
+  // Kupac vidi reklamaciju na Temelju: potvrdio je stan i ovo je njegova reklamacija
+  $kupacNaTemelju = $stan && $stan->temelj_kupac_status === 'potvrdjen' && $rek->kupac_id && $rek->kupac_id === $stan->kupac_id;
 @endphp
 
 <x-zaglavlje :naslov="($stan->oznaka ?? '—').' — '.$tipNaziv"
   :putanja="[($jeNadzor ? 'Moje reklamacije' : 'Reklamacije') => route('claims.index'), '#REK-'.$rek->id => null]"
   :opis="collect([$zgrada?->naziv, $zgrada?->project?->naziv, 'prijavljeno '.$rek->datum_prijave?->format('d.m.Y.')])->filter()->implode(' · ')">
-  <x-slot:uzNaslov><x-status :v="$rek->status" /></x-slot:uzNaslov>
+  <x-slot:uzNaslov><x-status :v="$rek->status" />@if($rek->izvor === 'temelj')<span class="cip bg-secondary-fixed text-on-secondary-fixed-variant">Prijavio kupac sa Temelja</span>@endif</x-slot:uzNaslov>
   @if($stan && !$jeNadzor)
   <a href="{{ route('units.show', $stan) }}" class="dugme-sekundarno"><span class="material-symbols-outlined text-[18px]">door_front</span>Dosije stana</a>
   @endif
@@ -59,7 +61,16 @@
         @csrf
         <label for="beleska" class="sr-only">Nova beleška</label>
         <textarea id="beleska" name="tekst" required rows="2" maxlength="2000" class="polje" placeholder="Upišite belešku: uviđaj, dogovor sa kupcem, nalog izvođaču…"></textarea>
-        <div class="flex justify-end"><button class="dugme-primarno dugme-malo"><span class="material-symbols-outlined text-[16px]">send</span>Dodaj belešku</button></div>
+        <div class="flex flex-wrap items-center justify-between gap-space-sm">
+          @if($kupacNaTemelju && !$jeNadzor)
+          <label class="flex items-center gap-space-sm font-body-md text-body-md cursor-pointer">
+            <input type="checkbox" name="vidljivo_kupcu" value="1" class="w-4 h-4 accent-black"> Pošalji kupcu (vidi je na Temelju i dobija email)
+          </label>
+          @else
+          <span class="font-body-sm text-body-sm text-on-surface-variant">Interna beleška — kupac je ne vidi.</span>
+          @endif
+          <button class="dugme-primarno dugme-malo"><span class="material-symbols-outlined text-[16px]">send</span>Dodaj</button>
+        </div>
       </form>
       <ol class="flex flex-col gap-space-sm">
         @forelse($rek->notes as $b)
@@ -68,7 +79,9 @@
           <span class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0 text-[12px] font-semibold">{{ $ini }}</span>
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center justify-between gap-x-space-sm">
-              <span class="font-label-md text-label-md font-semibold">{{ $b->user->ime_prezime ?? 'Sistem' }}</span>
+              <span class="font-label-md text-label-md font-semibold">{{ $b->od_kupca ? 'Kupac ('.($kupac->ime_prezime ?? 'Temelj').')' : ($b->user->ime_prezime ?? 'Sistem') }}
+                @if($b->od_kupca)<span class="cip bg-secondary-fixed text-on-secondary-fixed-variant ml-1">sa Temelja</span>@elseif($b->vidljivo_kupcu)<span class="cip bg-emerald-50 text-emerald-800 ml-1">poslato kupcu</span>@endif
+              </span>
               <span class="font-mono-num text-body-sm text-on-surface-variant">{{ $b->created_at->format('d.m.Y. H:i') }}</span>
             </div>
             <p class="font-body-md text-body-md mt-0.5 whitespace-pre-line">{{ $b->tekst }}</p>
