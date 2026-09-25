@@ -54,6 +54,12 @@
             @if($imaFajl)
             <a href="{{ route('documents.download', $dok) }}" class="dugme-sekundarno dugme-malo" title="Preuzmi fajl"><span class="material-symbols-outlined text-[16px]">download</span>Preuzmi</a>
             @endif
+            @if($dok->aktivna_verzija && $currentTenant?->povezanSaTemeljem())
+            <form method="POST" action="{{ route('documents.kupcu', $dok) }}">
+              @csrf
+              <button class="dugme-tiho dugme-malo {{ $dok->vidljivo_kupcu ? 'text-emerald-700' : '' }}" title="{{ $dok->vidljivo_kupcu ? 'Kupac vidi dokument na Temelju — klik da sakrijete' : 'Kupac ne vidi dokument — klik da ga prikažete na Temelju' }}"><span class="material-symbols-outlined text-[16px]">{{ $dok->vidljivo_kupcu ? 'visibility' : 'visibility_off' }}</span></button>
+            </form>
+            @endif
             @if($dok->aktivna_verzija && $currentUser->mozeAdministrirati())
             <form method="POST" action="{{ route('documents.destroy', $dok) }}" data-potvrdi="Arhivirati ovu verziju dokumenta? Ostaje sačuvana u arhivi.">
               @csrf @method('DELETE')

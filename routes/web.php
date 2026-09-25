@@ -30,6 +30,10 @@ Route::middleware('guest')->group(function () {
 
 Route::get('/registracija/potvrda/{token}', [RegistracijaController::class, 'potvrda'])->name('registracija.potvrda');
 
+// Kupac sa Temelja preuzima dokument preko potpisanog linka (važi 5 minuta; bez prijave ovde)
+Route::get('/temelj/dokument/{dokument}', [DocumentController::class, 'preuzmiKupac'])
+    ->whereNumber('dokument')->middleware(['signed', 'throttle:30,1'])->name('temelj.dokument');
+
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 // Prijavljeni, bez obzira na stanje firme: ekran statusa zahteva i promena lozinke
@@ -79,6 +83,7 @@ Route::middleware(['auth', 'firma'])->group(function () {
         Route::post('/dokumenti', [DocumentController::class, 'store'])->name('documents.store');
         Route::get('/dokumenti/{document}/preuzmi', [DocumentController::class, 'download'])->name('documents.download');
         Route::delete('/dokumenti/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+        Route::post('/dokumenti/{document}/kupcu', [DocumentController::class, 'kupcu'])->name('documents.kupcu');
 
         Route::get('/checkliste', [ChecklistController::class, 'index'])->name('checklists.index');
         Route::get('/zgrade/{building}/checkliste', [ChecklistController::class, 'show'])->name('checklists.show');

@@ -35,6 +35,47 @@ class TemeljController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Spisak dokumenata za kupca stana (samo potvrđen kupac, samo dokumenti označeni "vidljivo kupcu"). */
+    public function kupacDokumenti(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        $stan = \App\Services\KupciNaTemelju::potvrdjenStan((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        if (! $stan) {
+            return response()->json(['ok' => false, 'greska' => 'Nema pristupa.'], 404);
+        }
+        $dokumenti = \App\Services\KupciNaTemelju::dokumentiKupca($stan)
+            ->orderByRaw('stan_id IS NULL')->orderByDesc('datum_izdavanja')->orderByDesc('id')
+            ->get(['id', 'stan_id', 'tip', 'naziv', 'datum_izdavanja', 'izdavalac', 'verzija', 'putanja_fajla'])
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'nivo' => $d->stan_id ? 'stan' : 'zgrada',
+                'tip' => \App\Support\Prikaz::label($d->tip),
+                'naziv' => $d->naziv,
+                'datum' => $d->datum_izdavanja?->format('d.m.Y.'),
+                'izdavalac' => $d->izdavalac,
+                'verzija' => $d->verzija,
+                'format' => strtoupper(pathinfo((string) $d->putanja_fajla, PATHINFO_EXTENSION)),
+            ])->values();
+
+        return response()->json(['ok' => true, 'dokumenti' => $dokumenti]);
+    }
+
+    /** Kratkotrajan potpisan link za preuzimanje jednog dokumenta (važi 5 minuta, vezan za stan). */
+    public function kupacDokumentLink(Request $request)
+    {
+        abort_unless(TemeljApi::ispravanZahtev($request), 401);
+        $stan = \App\Services\KupciNaTemelju::potvrdjenStan((int) $request->input('tenant_id'), (int) $request->input('stan_id'));
+        $dok = $stan ? \App\Services\KupciNaTemelju::dokumentiKupca($stan)->find((int) $request->input('dokument_id')) : null;
+        if (! $dok || ! $dok->imaFajl()) {
+            return response()->json(['ok' => false, 'greska' => 'Dokument nije dostupan.'], 404);
+        }
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('temelj.dokument', now()->addMinutes(5), [
+            'dokument' => $dok->id, 'stan' => $stan->id,
+        ]);
+
+        return response()->json(['ok' => true, 'url' => $url]);
+    }
+
     /** Obaveštenje da je veza firme odobrena, odbijena ili opozvana. */
     public function veza(Request $request)
     {

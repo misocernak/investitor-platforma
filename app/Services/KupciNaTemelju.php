@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Document;
 use App\Models\Tenant;
 use App\Models\Unit;
 
@@ -48,6 +49,27 @@ class KupciNaTemelju
     public static function ukloniPristup(Unit $stan): bool
     {
         return self::moze($stan) && self::posalji($stan, 'ukloni');
+    }
+
+    /**
+     * Stan čiji je kupac potvrdio pristup na Temelju (inače null) — jedina ulazna tačka za dokumente kupca.
+     * Temelj šalje tenant_id + stan_id tek pošto proveri da stan pripada prijavljenom kupcu; ovde se to
+     * dodatno proverava sa strane investitora (stan te firme, kupac potvrdio).
+     */
+    public static function potvrdjenStan(int $tenantId, int $stanId): ?Unit
+    {
+        return Unit::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('temelj_kupac_status', 'potvrdjen')->find($stanId);
+    }
+
+    /** Aktivne verzije dokumenata koje kupac tog stana sme da vidi: dokumenti njegove zgrade i njegovog stana. */
+    public static function dokumentiKupca(Unit $stan)
+    {
+        return Document::withoutGlobalScopes()
+            ->where('tenant_id', $stan->tenant_id)
+            ->where('aktivna_verzija', true)
+            ->where('vidljivo_kupcu', true)
+            ->where(fn ($q) => $q->where('stan_id', $stan->id)
+                ->orWhere(fn ($w) => $w->whereNull('stan_id')->where('zgrada_id', $stan->zgrada_id)));
     }
 
     /** Obaveštenje sa Temelja: kupac je potvrdio stan. */

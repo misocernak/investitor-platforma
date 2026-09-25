@@ -47,6 +47,7 @@ class DocumentController extends Controller
             'projekat_id' => ['nullable', 'exists:projects,id'],
             'zgrada_id' => ['required_without:stan_id', 'nullable', 'exists:buildings,id'],
             'stan_id' => ['nullable', 'exists:units,id'],
+            'vidljivo_kupcu' => ['nullable', 'boolean'],
         ]);
 
         // Dokument stana pripada i zgradi tog stana
@@ -86,6 +87,7 @@ class DocumentController extends Controller
             'putanja_fajla' => $putanja,
             'verzija' => $verzija,
             'aktivna_verzija' => true,
+            'vidljivo_kupcu' => $request->boolean('vidljivo_kupcu'),
         ]);
 
         AuditLog::zabelezi('upload_dokumenta', $dokument, [
@@ -103,6 +105,35 @@ class DocumentController extends Controller
             $document->putanja_fajla,
             $document->naziv.'_v'.$document->verzija.'.'.pathinfo($document->putanja_fajla, PATHINFO_EXTENSION)
         );
+    }
+
+    /**
+     * Preuzimanje za kupca sa Temelja: link potpisuje ova aplikacija (middleware "signed"), važi 5 minuta
+     * i vezan je za stan. Pristup se ponovo proverava — ako je kupcu u međuvremenu uklonjen pristup
+     * ili je dokument sakriven, link više ne radi.
+     */
+    public function preuzmiKupac(Request $request, int $dokument)
+    {
+        $stan = \App\Models\Unit::withoutGlobalScopes()->where('temelj_kupac_status', 'potvrdjen')->find((int) $request->query('stan'));
+        $dok = $stan ? \App\Services\KupciNaTemelju::dokumentiKupca($stan)->find($dokument) : null;
+        abort_unless($dok && $dok->imaFajl(), 404);
+
+        return Storage::disk('documents')->download(
+            $dok->putanja_fajla,
+            $dok->naziv.'_v'.$dok->verzija.'.'.pathinfo($dok->putanja_fajla, PATHINFO_EXTENSION),
+            ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']
+        );
+    }
+
+    /** Uključuje/isključuje vidljivost dokumenta kupcu na Temelju. */
+    public function kupcu(Document $document)
+    {
+        $document->update(['vidljivo_kupcu' => ! $document->vidljivo_kupcu]);
+        AuditLog::zabelezi($document->vidljivo_kupcu ? 'dokument_vidljiv_kupcu' : 'dokument_skriven_od_kupca', $document, ['naziv' => $document->naziv]);
+
+        return back()->with('uspesno', $document->vidljivo_kupcu
+            ? 'Kupac(i) sada vide dokument "'.$document->naziv.'" na Temelju.'
+            : 'Dokument "'.$document->naziv.'" više nije vidljiv kupcu.');
     }
 
     public function destroy(Document $document)

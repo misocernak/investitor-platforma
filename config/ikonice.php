@@ -83,6 +83,7 @@ return [
     'upload_file',
     'verified',
     'verified_user',
+    'visibility',
     'visibility_off',
     'warning',
     'water_drop',

@@ -55,6 +55,13 @@
       <x-polje labela="Datum izdavanja" za="dok-datum"><input class="polje" id="dok-datum" name="datum_izdavanja" type="date"/></x-polje>
       <x-polje labela="Izdavalac" za="dok-izdavalac"><input class="polje" id="dok-izdavalac" name="izdavalac" placeholder="npr. Sekretarijat za urbanizam"/></x-polje>
     </div>
+    @if($currentTenant?->povezanSaTemeljem())
+    <label class="flex items-start gap-space-sm font-body-md text-body-md cursor-pointer">
+      <input type="hidden" name="vidljivo_kupcu" value="0">
+      <input type="checkbox" name="vidljivo_kupcu" value="1" @checked($stan) class="w-4 h-4 mt-0.5 accent-black">
+      <span>Vidljivo kupcu na Temelju<span class="block font-body-sm text-body-sm text-on-surface-variant">{{ $stan ? 'Vidi ga samo kupac ovog stana.' : 'Vide ga kupci stanova u ovoj zgradi.' }}</span></span>
+    </label>
+    @endif
     <p class="font-body-sm text-body-sm text-on-surface-variant flex items-start gap-1.5"><span class="material-symbols-outlined text-[16px]">policy</span>Isti tip za istu zgradu/stan postaje nova verzija (v2, v3…), a prethodna ostaje u arhivi. Sistem ne proverava pravnu ispravnost dokumenta.</p>
     <div class="flex justify-end gap-space-sm pt-space-xs">
       <button type="button" data-modal-close="modal-dokument" class="dugme-sekundarno">Otkaži</button>

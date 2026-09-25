@@ -12,12 +12,13 @@ class Document extends Model
 
     protected $fillable = [
         'tenant_id', 'projekat_id', 'zgrada_id', 'stan_id', 'tip', 'naziv',
-        'datum_izdavanja', 'izdavalac', 'putanja_fajla', 'verzija', 'aktivna_verzija',
+        'datum_izdavanja', 'izdavalac', 'putanja_fajla', 'verzija', 'aktivna_verzija', 'vidljivo_kupcu',
     ];
 
     protected $casts = [
         'datum_izdavanja' => 'date',
         'aktivna_verzija' => 'boolean',
+        'vidljivo_kupcu' => 'boolean',
     ];
 
     public function project()

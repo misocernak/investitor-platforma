@@ -185,9 +185,17 @@
               <div class="font-body-sm text-body-sm text-on-surface-variant">{{ Prikaz::label($dok->tip) }} · v{{ $dok->verzija }}{{ $dok->datum_izdavanja ? ' · '.$dok->datum_izdavanja->format('d.m.Y.') : '' }}</div>
             </div>
           </div>
-          @if($dok->imaFajl())
-          <a href="{{ route('documents.download', $dok) }}" class="dugme-sekundarno dugme-malo bg-surface-container-lowest shrink-0"><span class="material-symbols-outlined text-[16px]">download</span>Preuzmi</a>
-          @endif
+          <div class="flex items-center gap-1 shrink-0">
+            @if($currentTenant?->povezanSaTemeljem())
+            <form method="POST" action="{{ route('documents.kupcu', $dok) }}">
+              @csrf
+              <button class="dugme-tiho dugme-malo {{ $dok->vidljivo_kupcu ? 'text-emerald-700' : '' }}" title="{{ $dok->vidljivo_kupcu ? 'Kupac vidi dokument na Temelju — klik da sakrijete' : 'Kupac ne vidi dokument — klik da ga prikažete na Temelju' }}"><span class="material-symbols-outlined text-[16px]">{{ $dok->vidljivo_kupcu ? 'visibility' : 'visibility_off' }}</span></button>
+            </form>
+            @endif
+            @if($dok->imaFajl())
+            <a href="{{ route('documents.download', $dok) }}" class="dugme-sekundarno dugme-malo bg-surface-container-lowest"><span class="material-symbols-outlined text-[16px]">download</span>Preuzmi</a>
+            @endif
+          </div>
         </div>
         @empty
         <x-prazno ikonica="folder_open" naslov="Nema dokumenata" tekst="Ugovor sa kupcem, zapisnik o primopredaji i ostala dokumenta stana." />

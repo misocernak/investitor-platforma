@@ -30,4 +30,6 @@ Route::middleware('throttle:120,1')->prefix('temelj')->group(function () {
     Route::post('/upit', [\App\Http\Controllers\Api\TemeljController::class, 'upit']);
     Route::post('/veza', [\App\Http\Controllers\Api\TemeljController::class, 'veza']);
     Route::post('/kupac', [\App\Http\Controllers\Api\TemeljController::class, 'kupac']);
+    Route::post('/kupac/dokumenti', [\App\Http\Controllers\Api\TemeljController::class, 'kupacDokumenti']);
+    Route::post('/kupac/dokument-link', [\App\Http\Controllers\Api\TemeljController::class, 'kupacDokumentLink']);
 });
