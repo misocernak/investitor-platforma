@@ -57,7 +57,7 @@
       <span class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-semibold shrink-0">1</span>
       <div>
         <h2 class="font-headline-sm text-headline-sm">Fotografije</h2>
-        <p class="font-body-md text-body-md text-on-surface-variant">Do {{ config('temelj.maks_slika') }} fotografija stana, zgrade ili renderi. Naslovna se prikazuje u listi stanova. Tlocrt označite da bi kupci videli raspored.</p>
+        <p class="font-body-md text-body-md text-on-surface-variant">Do {{ config('temelj.maks_slika') }} fotografija stana, zgrade ili renderi. Naslovna se prikazuje u listi stanova. Plan stana (raspored prostorija) označite da bi ga kupci videli posebno.</p>
       </div>
     </div>
 
@@ -71,7 +71,7 @@
         </div>
         <div class="p-2 flex flex-col gap-1 font-body-sm text-body-sm">
           <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="naslovna" value="{{ $s->id }}" class="accent-black" @checked($s->id === $naslovnaId)> Naslovna</label>
-          <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="tlocrt[]" value="{{ $s->id }}" class="accent-black" @checked($s->tip === 'tlocrt')> Ovo je tlocrt</label>
+          <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" name="tlocrt[]" value="{{ $s->id }}" class="accent-black" @checked($s->tip === 'tlocrt')> Ovo je plan stana</label>
           <label class="flex items-center gap-1.5 cursor-pointer text-error"><input type="checkbox" name="obrisi[]" value="{{ $s->id }}" class="accent-red-600" onchange="this.closest('[data-slika]').classList.toggle('opacity-40', this.checked)"> Ukloni</label>
         </div>
       </div>
