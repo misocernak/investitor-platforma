@@ -24,6 +24,7 @@ return [
     'checklist',
     'chevron_right',
     'close',
+    'content_copy',
     'dashboard',
     'delete',
     'description',

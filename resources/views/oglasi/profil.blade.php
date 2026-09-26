@@ -44,6 +44,25 @@
       </div>
     </form>
   </section>
+
+  @if(!empty($profil['znacka_url']) && !empty($profil['profil_url']))
+  @php
+    $kodZnacke = '<a href="'.e($profil['profil_url']).'" target="_blank" rel="noopener"><img src="'.e($profil['znacka_url']).'" alt="Ocena kupaca na Temelju" width="240" height="56" loading="lazy"></a>';
+  @endphp
+  <section class="kartica p-space-lg max-w-3xl flex flex-col gap-space-md">
+    <div class="flex flex-col gap-1">
+      <h2 class="font-headline-sm text-headline-sm">Bedž za vaš sajt</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant">Prikažite ocenu kupaca sa Temelja na svom sajtu. Ocena se sama osvežava; klik vodi na vaš profil. Kod nalepite u HTML sajta (ili ga pošaljite osobi koja održava sajt).</p>
+    </div>
+    <div class="p-space-md rounded bg-surface-container-low flex items-center">
+      <img src="{{ $profil['znacka_url'] }}" alt="Ocena kupaca na Temelju" width="240" height="56">
+    </div>
+    <x-polje labela="HTML kod" za="znacka-kod">
+      <textarea class="polje font-mono-num text-[13px]" id="znacka-kod" rows="3" readonly onclick="this.select()">{{ $kodZnacke }}</textarea>
+    </x-polje>
+    <div><button type="button" class="dugme-sekundarno dugme-malo" id="znacka-kopiraj"><span class="material-symbols-outlined text-[16px]">content_copy</span>Kopiraj kod</button></div>
+  </section>
+  @endif
 @endif
 @endsection
 
@@ -55,6 +74,15 @@
   var osvezi = function () { brojac.textContent = polje.value.length; };
   polje.addEventListener('input', osvezi);
   osvezi();
+})();
+(function () {
+  var dugme = document.getElementById('znacka-kopiraj'), kod = document.getElementById('znacka-kod');
+  if (!dugme || !kod) return;
+  dugme.addEventListener('click', function () {
+    kod.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(kod.value) : Promise.reject()).catch(function () { document.execCommand('copy'); })
+      .finally(function () { dugme.lastChild.textContent = 'Kopirano'; setTimeout(function () { dugme.lastChild.textContent = 'Kopiraj kod'; }, 1800); });
+  });
 })();
 </script>
 @endpush
